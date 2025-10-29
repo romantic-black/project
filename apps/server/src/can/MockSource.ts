@@ -1,6 +1,7 @@
-import type { CanFrame } from '@can-telemetry/common';
-import type { ICanSource, SourceStats } from './ICanSource.js';
+import type { CanFrame, SourceStats } from '@can-telemetry/common';
+import type { ICanSource } from './ICanSource.js';
 import dbcLoader from '../dbc/loader.js';
+import { encodeBits, inverseScale, isBigEndian, clamp } from '../decoder/bitops.js';
 
 export class MockSource implements ICanSource {
   private frameCallback?: (frame: CanFrame) => void;
@@ -31,25 +32,35 @@ export class MockSource implements ICanSource {
       const interval = setInterval(() => {
         if (!this.frameCallback) return;
 
-        const data = Buffer.alloc(8);
-        let offset = 0;
+        const data = Buffer.alloc(msg.length || 8);
+        data.fill(0); // Initialize with zeros
 
         for (const signal of msg.signals || []) {
-          const min = signal.min ?? 0;
-          const max = signal.max ?? 255;
-          const rawValue = Math.floor(Math.random() * (max - min + 1)) + min;
+          try {
+            // Generate a random physical value within min/max range
+            const min = signal.min ?? 0;
+            const max = signal.max ?? 255;
+            const physicalValue = Math.random() * (max - min) + min;
+            const clampedValue = clamp(physicalValue, min, max);
 
-          const bitLength = signal.length ?? 8;
+            // Convert physical value to raw value (inverse of scaling)
+            const factor = signal.factor ?? 1;
+            const offset = signal.offset ?? 0;
+            const rawValue = inverseScale(clampedValue, factor, offset);
 
-          if (bitLength <= 8 && offset < 8) {
-            data[offset] = rawValue;
-            offset++;
-          } else if (bitLength <= 16 && offset < 7) {
-            data.writeUInt16BE(rawValue, offset);
-            offset += 2;
-          } else if (offset < 5) {
-            data.writeUInt32BE(rawValue, offset);
-            offset += 4;
+            // Encode raw value to buffer at correct bit position
+            const startBit = signal.startBit ?? 0;
+            const length = signal.length ?? 8;
+            const bigEndian = isBigEndian(signal.endianness);
+
+            // Ensure raw value fits in the bit range
+            const maxRawValue = (1 << length) - 1;
+            const minRawValue = length > 31 ? -2147483648 : (length === 1 ? 0 : -(1 << (length - 1)));
+            const clampedRawValue = Math.max(minRawValue, Math.min(maxRawValue, rawValue));
+
+            encodeBits(data, startBit, length, clampedRawValue, bigEndian);
+          } catch (error) {
+            console.warn(`Failed to encode signal ${signal.name} in message ${msg.name}:`, error);
           }
         }
 

@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
-import { join } from 'path';
+import { join, dirname } from 'path';
+import { mkdirSync } from 'fs';
 import type { DbSignalAgg } from '@can-telemetry/common';
 import config, { PROJECT_ROOT } from '../config.js';
 import * as schema from './schema.js';
@@ -18,8 +19,69 @@ export class DbRepo {
       ? config.DB_PATH
       : join(PROJECT_ROOT, config.DB_PATH);
     
+    // Ensure database directory exists
+    const dbDir = dirname(dbPath);
+    try {
+      mkdirSync(dbDir, { recursive: true });
+    } catch (error) {
+      // Directory might already exist, ignore error
+    }
+    
     this.db = new Database(dbPath);
     this.db.pragma('journal_mode = WAL');
+    
+    // Initialize database tables
+    this.initializeTables();
+  }
+
+  private initializeTables(): void {
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS frames_raw (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp INTEGER NOT NULL,
+        msg_id INTEGER NOT NULL,
+        data TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS signals_agg_1s (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp INTEGER NOT NULL,
+        signal_name TEXT NOT NULL,
+        last_value REAL NOT NULL,
+        first_value REAL NOT NULL,
+        avg_value REAL NOT NULL,
+        max_value REAL NOT NULL,
+        min_value REAL NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_signals_agg_1s_timestamp ON signals_agg_1s(timestamp);
+      CREATE INDEX IF NOT EXISTS idx_signals_agg_1s_signal_name ON signals_agg_1s(signal_name);
+
+      CREATE TABLE IF NOT EXISTS signals_agg_10s (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp INTEGER NOT NULL,
+        signal_name TEXT NOT NULL,
+        last_value REAL NOT NULL,
+        first_value REAL NOT NULL,
+        avg_value REAL NOT NULL,
+        max_value REAL NOT NULL,
+        min_value REAL NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_signals_agg_10s_timestamp ON signals_agg_10s(timestamp);
+      CREATE INDEX IF NOT EXISTS idx_signals_agg_10s_signal_name ON signals_agg_10s(signal_name);
+
+      CREATE TABLE IF NOT EXISTS events_alarm (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp INTEGER NOT NULL,
+        signal_name TEXT NOT NULL,
+        value REAL NOT NULL,
+        level TEXT NOT NULL,
+        message TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_events_alarm_timestamp ON events_alarm(timestamp);
+    `);
   }
 
   batchInsertSignalValue(timestamp: number, signalName: string, value: number): void {
