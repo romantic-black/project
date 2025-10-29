@@ -6,7 +6,7 @@ import { getValTableText } from '../utils/dbc';
 import * as echarts from 'echarts';
 
 export default function VCU() {
-  const { getSignal } = useTelemetryStore();
+  const { getSignal, messages } = useTelemetryStore();
 
   const angSpeed = getSignal('VCU_VehAngSpeed');
   const brkPres = getSignal('VCU_BrkPres');
@@ -14,6 +14,8 @@ export default function VCU() {
   const modeSwitchFlag = getSignal('VCU_ModeSwitchingFlag');
   const modeSwitchAvail = getSignal('VCU_ModeSwitchAvailFlag');
   const odo = getSignal('VCU_OdoMeter');
+
+  const vcuInfo1Timestamp = messages.get('VCU_Info1')?.timestamp;
 
   const chartOption: echarts.EChartsOption = useMemo(
     () => ({
@@ -42,18 +44,18 @@ export default function VCU() {
         {
           name: '角速度',
           type: 'line',
-          data: [{ time: Date.now(), value: angSpeed || 0 }],
+          data: vcuInfo1Timestamp ? [[vcuInfo1Timestamp, angSpeed ?? 0]] : [],
           yAxisIndex: 0,
         },
         {
           name: '制动压力',
           type: 'line',
-          data: [{ time: Date.now(), value: brkPres || 0 }],
+          data: vcuInfo1Timestamp ? [[vcuInfo1Timestamp, brkPres ?? 0]] : [],
           yAxisIndex: 1,
         },
       ],
     }),
-    [angSpeed, brkPres]
+    [angSpeed, brkPres, vcuInfo1Timestamp]
   );
 
   return (

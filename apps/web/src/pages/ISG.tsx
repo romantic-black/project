@@ -5,7 +5,7 @@ import { ChartContainer } from '../components/ChartContainer';
 import * as echarts from 'echarts';
 
 export default function ISG() {
-  const { getSignal } = useTelemetryStore();
+  const { getSignal, messages } = useTelemetryStore();
 
   const voltage = getSignal('ISG_DCvoltage');
   const current = getSignal('ISG_DCcurrent');
@@ -21,6 +21,9 @@ export default function ISG() {
   const maxTorque = getSignal('ISG_MaxTrq');
   const mode = getSignal('ISG_ActMode');
   const enabled = getSignal('ISG_ActEnSts');
+
+  const isgInfo1Timestamp = messages.get('ISG_Info1')?.timestamp;
+  const isgInfo2Timestamp = messages.get('ISG_Info2')?.timestamp;
 
   const chartOption: echarts.EChartsOption = useMemo(
     () => ({
@@ -49,18 +52,18 @@ export default function ISG() {
         {
           name: '转速',
           type: 'line',
-          data: [{ time: Date.now(), value: speed || 0 }],
+          data: isgInfo1Timestamp ? [[isgInfo1Timestamp, speed ?? 0]] : [],
           yAxisIndex: 0,
         },
         {
           name: '扭矩',
           type: 'line',
-          data: [{ time: Date.now(), value: torque || 0 }],
+          data: isgInfo1Timestamp ? [[isgInfo1Timestamp, torque ?? 0]] : [],
           yAxisIndex: 1,
         },
       ],
     }),
-    [speed, torque]
+    [speed, torque, isgInfo1Timestamp]
   );
 
   const powerChartOption: echarts.EChartsOption = useMemo(
@@ -90,24 +93,24 @@ export default function ISG() {
         {
           name: '电压',
           type: 'line',
-          data: [{ time: Date.now(), value: voltage || 0 }],
+          data: isgInfo2Timestamp ? [[isgInfo2Timestamp, voltage ?? 0]] : [],
           yAxisIndex: 0,
         },
         {
           name: '电流',
           type: 'line',
-          data: [{ time: Date.now(), value: current || 0 }],
+          data: isgInfo2Timestamp ? [[isgInfo2Timestamp, current ?? 0]] : [],
           yAxisIndex: 1,
         },
         {
           name: '功率',
           type: 'line',
-          data: [{ time: Date.now(), value: power || 0 }],
+          data: isgInfo2Timestamp ? [[isgInfo2Timestamp, power ?? 0]] : [],
           yAxisIndex: 1,
         },
       ],
     }),
-    [voltage, current, power]
+    [voltage, current, power, isgInfo2Timestamp]
   );
 
   return (

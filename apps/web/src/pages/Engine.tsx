@@ -6,7 +6,7 @@ import { getValTableText } from '../utils/dbc';
 import * as echarts from 'echarts';
 
 export default function Engine() {
-  const { getSignal } = useTelemetryStore();
+  const { getSignal, messages } = useTelemetryStore();
 
   const torque = getSignal('EEC1_ActEngPcntTrq');
   const speed = getSignal('EEC1_EngSpeed');
@@ -16,6 +16,9 @@ export default function Engine() {
   const starterMode = getSignal('EEC1_EngStarterMode');
   const demandTrq = getSignal('EEC1_DemandPcntTrq');
   const driverTrq = getSignal('EEC1_DriverDemandPcntTrq');
+
+  const eec1Timestamp = messages.get('J1939_EEC1')?.timestamp;
+  const eec2Timestamp = messages.get('J1939_EEC2')?.timestamp;
 
   const chartOption: echarts.EChartsOption = useMemo(
     () => ({
@@ -44,30 +47,30 @@ export default function Engine() {
         {
           name: '扭矩',
           type: 'line',
-          data: [{ time: Date.now(), value: torque || 0 }],
+          data: eec1Timestamp ? [[eec1Timestamp, torque ?? 0]] : [],
           yAxisIndex: 0,
         },
         {
           name: '转速',
           type: 'line',
-          data: [{ time: Date.now(), value: speed || 0 }],
+          data: eec1Timestamp ? [[eec1Timestamp, speed ?? 0]] : [],
           yAxisIndex: 1,
         },
         {
           name: '负载',
           type: 'line',
-          data: [{ time: Date.now(), value: load || 0 }],
+          data: eec2Timestamp ? [[eec2Timestamp, load ?? 0]] : [],
           yAxisIndex: 0,
         },
         {
           name: '油门',
           type: 'line',
-          data: [{ time: Date.now(), value: throttle || 0 }],
+          data: eec2Timestamp ? [[eec2Timestamp, throttle ?? 0]] : [],
           yAxisIndex: 0,
         },
       ],
     }),
-    [torque, speed, load, throttle]
+    [torque, speed, load, throttle, eec1Timestamp, eec2Timestamp]
   );
 
   return (
