@@ -1,12 +1,16 @@
 import Database from 'better-sqlite3';
 import { join, dirname } from 'path';
-import { mkdirSync } from 'fs';
+import { mkdirSync, existsSync, renameSync, unlinkSync } from 'fs';
 import type { DbSignalAgg } from '@can-telemetry/common';
 import config, { PROJECT_ROOT } from '../config.js';
 import * as schema from './schema.js';
+import pino from 'pino';
+
+const logger = pino({ level: config.LOG_LEVEL });
 
 export class DbRepo {
   private db: Database.Database;
+  private dbPath: string;
   private batchSize = 100;
   private buffer: Array<{
     timestamp: number;
@@ -15,6 +19,7 @@ export class DbRepo {
   }> = [];
   private flushInterval?: NodeJS.Timeout;
   private cleanupInterval?: NodeJS.Timeout;
+  private isCorrupted = false;
   
   // Cached prepared statements
   private insert1sStmt?: Database.Statement;
@@ -25,22 +30,20 @@ export class DbRepo {
   private cleanupAlarmStmt?: Database.Statement;
 
   constructor() {
-    const dbPath = config.DB_PATH.startsWith('/')
+    this.dbPath = config.DB_PATH.startsWith('/')
       ? config.DB_PATH
       : join(PROJECT_ROOT, config.DB_PATH);
     
     // Ensure database directory exists
-    const dbDir = dirname(dbPath);
+    const dbDir = dirname(this.dbPath);
     try {
       mkdirSync(dbDir, { recursive: true });
     } catch (error) {
       // Directory might already exist, ignore error
     }
     
-    this.db = new Database(dbPath);
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('synchronous = NORMAL');
-    this.db.pragma('cache_size = -64000'); // 64MB cache
+    this.db = this.openDatabase();
+    this.verifyIntegrity();
     
     // Initialize database tables
     this.initializeTables();
@@ -59,6 +62,95 @@ export class DbRepo {
     this.cleanupInterval = setInterval(() => {
       this.cleanupTTL(7);
     }, 3600000);
+  }
+
+  private openDatabase(): Database.Database {
+    const db = new Database(this.dbPath);
+    db.pragma('journal_mode = WAL');
+    db.pragma('synchronous = NORMAL');
+    db.pragma('cache_size = -64000'); // 64MB cache
+    return db;
+  }
+
+  private verifyIntegrity(): void {
+    try {
+      const result = this.db.prepare('PRAGMA integrity_check').get() as { integrity_check: string };
+      if (result.integrity_check !== 'ok') {
+        logger.warn({ integrity: result.integrity_check }, 'Database integrity check failed');
+        this.recoverDatabase();
+      }
+    } catch (error: any) {
+      if (error?.code === 'SQLITE_CORRUPT') {
+        logger.error('Database is corrupted, attempting recovery...');
+        this.recoverDatabase();
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  private recoverDatabase(): void {
+    logger.warn('Attempting to recover corrupted database...');
+    
+    try {
+      // Close existing database connection
+      if (this.db) {
+        try {
+          this.db.close();
+        } catch (error) {
+          // Ignore errors when closing corrupted database
+        }
+      }
+
+      // Backup corrupted database
+      if (existsSync(this.dbPath)) {
+        const backupPath = `${this.dbPath}.corrupted.${Date.now()}`;
+        try {
+          renameSync(this.dbPath, backupPath);
+          logger.warn({ backupPath }, 'Corrupted database backed up');
+        } catch (error) {
+          logger.error({ error }, 'Failed to backup corrupted database');
+        }
+      }
+
+      // Clean up WAL and SHM files if they exist
+      const walPath = `${this.dbPath}-wal`;
+      const shmPath = `${this.dbPath}-shm`;
+      try {
+        if (existsSync(walPath)) unlinkSync(walPath);
+        if (existsSync(shmPath)) unlinkSync(shmPath);
+      } catch (error) {
+        // Ignore errors when removing WAL/SHM files
+      }
+
+      // Open new database
+      this.db = this.openDatabase();
+      this.initializeTables();
+      this.initializeStatements();
+      
+      this.isCorrupted = false;
+      logger.info('Database recovery completed successfully');
+    } catch (error) {
+      logger.error({ error }, 'Database recovery failed');
+      this.isCorrupted = true;
+      throw error;
+    }
+  }
+
+  private handleCorruption(error: any): void {
+    if (error?.code === 'SQLITE_CORRUPT' && !this.isCorrupted) {
+      logger.error('Database corruption detected during operation, attempting recovery...');
+      this.isCorrupted = true;
+      try {
+        this.recoverDatabase();
+        logger.info('Database recovered, operation can continue');
+      } catch (recoveryError) {
+        logger.error({ error: recoveryError }, 'Database recovery failed');
+        throw recoveryError;
+      }
+    } else {
+      throw error;
+    }
   }
 
   private initializeTables(): void {
@@ -174,6 +266,11 @@ export class DbRepo {
 
   private flush(): void {
     if (this.buffer.length === 0) return;
+    if (this.isCorrupted) {
+      logger.warn('Skipping flush due to database corruption');
+      this.buffer = [];
+      return;
+    }
 
     const now = Date.now();
     const oneSecondAgo = now - 1000;
@@ -214,134 +311,234 @@ export class DbRepo {
       }
     }
 
-    const transaction = this.db.transaction(() => {
-      // Process 1s aggregates
-      for (const [bucketKey, windowValues] of oneSecondBuckets.entries()) {
-        if (windowValues.length === 0) continue;
-        
-        const [timestampStr, signalName] = bucketKey.split('_');
-        const timestamp = parseInt(timestampStr, 10);
-        
-        // Sort by timestamp to get correct first/last
-        windowValues.sort((a, b) => a.timestamp - b.timestamp);
-        
-        const last1s = windowValues[windowValues.length - 1];
-        const first1s = windowValues[0];
-        const sum1s = windowValues.reduce((acc, v) => acc + v.value, 0);
-        const avg1s = sum1s / windowValues.length;
-        const max1s = Math.max(...windowValues.map((v) => v.value));
-        const min1s = Math.min(...windowValues.map((v) => v.value));
+    try {
+      const transaction = this.db.transaction(() => {
+        // Process 1s aggregates
+        for (const [bucketKey, windowValues] of oneSecondBuckets.entries()) {
+          if (windowValues.length === 0) continue;
+          
+          const [timestampStr, signalName] = bucketKey.split('_');
+          const timestamp = parseInt(timestampStr, 10);
+          
+          // Sort by timestamp to get correct first/last
+          windowValues.sort((a, b) => a.timestamp - b.timestamp);
+          
+          const last1s = windowValues[windowValues.length - 1];
+          const first1s = windowValues[0];
+          const sum1s = windowValues.reduce((acc, v) => acc + v.value, 0);
+          const avg1s = sum1s / windowValues.length;
+          const max1s = Math.max(...windowValues.map((v) => v.value));
+          const min1s = Math.min(...windowValues.map((v) => v.value));
 
-        this.insert1sStmt!.run(
-          timestamp,
-          signalName,
-          last1s.value,
-          first1s.value,
-          avg1s,
-          max1s,
-          min1s
-        );
+          this.insert1sStmt!.run(
+            timestamp,
+            signalName,
+            last1s.value,
+            first1s.value,
+            avg1s,
+            max1s,
+            min1s
+          );
+        }
+
+        // Process 10s aggregates
+        for (const [bucketKey, windowValues] of tenSecondBuckets.entries()) {
+          if (windowValues.length === 0) continue;
+          
+          const [timestampStr, signalName] = bucketKey.split('_');
+          const timestamp = parseInt(timestampStr, 10);
+          
+          // Sort by timestamp to get correct first/last
+          windowValues.sort((a, b) => a.timestamp - b.timestamp);
+          
+          const last10s = windowValues[windowValues.length - 1];
+          const first10s = windowValues[0];
+          const sum10s = windowValues.reduce((acc, v) => acc + v.value, 0);
+          const avg10s = sum10s / windowValues.length;
+          const max10s = Math.max(...windowValues.map((v) => v.value));
+          const min10s = Math.min(...windowValues.map((v) => v.value));
+
+          this.insert10sStmt!.run(
+            timestamp,
+            signalName,
+            last10s.value,
+            first10s.value,
+            avg10s,
+            max10s,
+            min10s
+          );
+        }
+      });
+
+      transaction();
+      this.buffer = [];
+    } catch (error: any) {
+      this.handleCorruption(error);
+      // Retry flush after recovery (but only once to avoid infinite loop)
+      if (!this.isCorrupted && this.buffer.length > 0) {
+        try {
+          const transaction = this.db.transaction(() => {
+            // Process 1s aggregates
+            for (const [bucketKey, windowValues] of oneSecondBuckets.entries()) {
+              if (windowValues.length === 0) continue;
+              
+              const [timestampStr, signalName] = bucketKey.split('_');
+              const timestamp = parseInt(timestampStr, 10);
+              
+              windowValues.sort((a, b) => a.timestamp - b.timestamp);
+              
+              const last1s = windowValues[windowValues.length - 1];
+              const first1s = windowValues[0];
+              const sum1s = windowValues.reduce((acc, v) => acc + v.value, 0);
+              const avg1s = sum1s / windowValues.length;
+              const max1s = Math.max(...windowValues.map((v) => v.value));
+              const min1s = Math.min(...windowValues.map((v) => v.value));
+
+              this.insert1sStmt!.run(
+                timestamp,
+                signalName,
+                last1s.value,
+                first1s.value,
+                avg1s,
+                max1s,
+                min1s
+              );
+            }
+
+            // Process 10s aggregates
+            for (const [bucketKey, windowValues] of tenSecondBuckets.entries()) {
+              if (windowValues.length === 0) continue;
+              
+              const [timestampStr, signalName] = bucketKey.split('_');
+              const timestamp = parseInt(timestampStr, 10);
+              
+              windowValues.sort((a, b) => a.timestamp - b.timestamp);
+              
+              const last10s = windowValues[windowValues.length - 1];
+              const first10s = windowValues[0];
+              const sum10s = windowValues.reduce((acc, v) => acc + v.value, 0);
+              const avg10s = sum10s / windowValues.length;
+              const max10s = Math.max(...windowValues.map((v) => v.value));
+              const min10s = Math.min(...windowValues.map((v) => v.value));
+
+              this.insert10sStmt!.run(
+                timestamp,
+                signalName,
+                last10s.value,
+                first10s.value,
+                avg10s,
+                max10s,
+                min10s
+              );
+            }
+          });
+
+          transaction();
+          this.buffer = [];
+        } catch (retryError) {
+          logger.error({ error: retryError }, 'Failed to flush after recovery, dropping buffer');
+          this.buffer = [];
+        }
+      } else {
+        this.buffer = [];
       }
-
-      // Process 10s aggregates
-      for (const [bucketKey, windowValues] of tenSecondBuckets.entries()) {
-        if (windowValues.length === 0) continue;
-        
-        const [timestampStr, signalName] = bucketKey.split('_');
-        const timestamp = parseInt(timestampStr, 10);
-        
-        // Sort by timestamp to get correct first/last
-        windowValues.sort((a, b) => a.timestamp - b.timestamp);
-        
-        const last10s = windowValues[windowValues.length - 1];
-        const first10s = windowValues[0];
-        const sum10s = windowValues.reduce((acc, v) => acc + v.value, 0);
-        const avg10s = sum10s / windowValues.length;
-        const max10s = Math.max(...windowValues.map((v) => v.value));
-        const min10s = Math.min(...windowValues.map((v) => v.value));
-
-        this.insert10sStmt!.run(
-          timestamp,
-          signalName,
-          last10s.value,
-          first10s.value,
-          avg10s,
-          max10s,
-          min10s
-        );
-      }
-    });
-
-    transaction();
-    this.buffer = [];
+    }
   }
 
   queryHistory(signals: string[], from: Date, to: Date, step: '1s' | '10s' = '1s'): DbSignalAgg[] {
-    const fromTs = from.getTime();
-    const toTs = to.getTime();
-    const placeholders = signals.map(() => '?').join(',');
+    if (this.isCorrupted) {
+      logger.warn('Database is corrupted, returning empty history');
+      return [];
+    }
 
-    // Use cached statement if available, otherwise create new one
-    // Note: We need dynamic statements because signals array can vary in length
-    // But we can optimize by preparing a statement for common signal counts
-    const stmt = this.db.prepare(`
-      SELECT timestamp, signal_name, last_value, first_value, avg_value, max_value, min_value
-      FROM ${step === '1s' ? 'signals_agg_1s' : 'signals_agg_10s'}
-      WHERE timestamp >= ? AND timestamp <= ? AND signal_name IN (${placeholders})
-      ORDER BY timestamp ASC, signal_name ASC
-    `);
+    try {
+      const fromTs = from.getTime();
+      const toTs = to.getTime();
+      const placeholders = signals.map(() => '?').join(',');
 
-    const rows = stmt.all(fromTs, toTs, ...signals) as any[];
-    
-    return rows.map((row) => ({
-      timestamp: row.timestamp,
-      signal_name: row.signal_name,
-      last_value: row.last_value,
-      first_value: row.first_value,
-      avg_value: row.avg_value,
-      max_value: row.max_value,
-      min_value: row.min_value,
-    }));
+      // Use cached statement if available, otherwise create new one
+      // Note: We need dynamic statements because signals array can vary in length
+      // But we can optimize by preparing a statement for common signal counts
+      const stmt = this.db.prepare(`
+        SELECT timestamp, signal_name, last_value, first_value, avg_value, max_value, min_value
+        FROM ${step === '1s' ? 'signals_agg_1s' : 'signals_agg_10s'}
+        WHERE timestamp >= ? AND timestamp <= ? AND signal_name IN (${placeholders})
+        ORDER BY timestamp ASC, signal_name ASC
+      `);
+
+      const rows = stmt.all(fromTs, toTs, ...signals) as any[];
+      
+      return rows.map((row) => ({
+        timestamp: row.timestamp,
+        signal_name: row.signal_name,
+        last_value: row.last_value,
+        first_value: row.first_value,
+        avg_value: row.avg_value,
+        max_value: row.max_value,
+        min_value: row.min_value,
+      }));
+    } catch (error: any) {
+      this.handleCorruption(error);
+      return [];
+    }
   }
 
   cleanupTTL(days: number = 7): void {
-    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
-    
-    this.cleanupFramesStmt!.run(cutoff);
-    this.cleanup1sStmt!.run(cutoff);
-    this.cleanup10sStmt!.run(cutoff);
-    this.cleanupAlarmStmt!.run(cutoff);
-    
-    // Run VACUUM periodically to reclaim space (but not too often)
-    if (Math.random() < 0.1) { // 10% chance each cleanup
-      this.db.exec('VACUUM');
+    if (this.isCorrupted) {
+      logger.warn('Skipping cleanup due to database corruption');
+      return;
+    }
+
+    try {
+      const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+      
+      this.cleanupFramesStmt!.run(cutoff);
+      this.cleanup1sStmt!.run(cutoff);
+      this.cleanup10sStmt!.run(cutoff);
+      this.cleanupAlarmStmt!.run(cutoff);
+      
+      // Run VACUUM periodically to reclaim space (but not too often)
+      if (Math.random() < 0.1) { // 10% chance each cleanup
+        this.db.exec('VACUUM');
+      }
+    } catch (error: any) {
+      this.handleCorruption(error);
     }
   }
 
   getSnapshot(signals: string[]): Record<string, number> {
     if (signals.length === 0) return {};
-    
-    const placeholders = signals.map(() => '?').join(',');
-    // Get the latest value for each signal using a subquery
-    const stmt = this.db.prepare(`
-      SELECT signal_name, last_value
-      FROM signals_agg_1s s1
-      WHERE signal_name IN (${placeholders})
-        AND timestamp = (
-          SELECT MAX(timestamp)
-          FROM signals_agg_1s s2
-          WHERE s2.signal_name = s1.signal_name
-        )
-    `);
-
-    const rows = stmt.all(...signals) as any[];
-    const snapshot: Record<string, number> = {};
-
-    for (const row of rows) {
-      snapshot[row.signal_name] = row.last_value;
+    if (this.isCorrupted) {
+      logger.warn('Database is corrupted, returning empty snapshot');
+      return {};
     }
 
-    return snapshot;
+    try {
+      const placeholders = signals.map(() => '?').join(',');
+      // Get the latest value for each signal using a subquery
+      const stmt = this.db.prepare(`
+        SELECT signal_name, last_value
+        FROM signals_agg_1s s1
+        WHERE signal_name IN (${placeholders})
+          AND timestamp = (
+            SELECT MAX(timestamp)
+            FROM signals_agg_1s s2
+            WHERE s2.signal_name = s1.signal_name
+          )
+      `);
+
+      const rows = stmt.all(...signals) as any[];
+      const snapshot: Record<string, number> = {};
+
+      for (const row of rows) {
+        snapshot[row.signal_name] = row.last_value;
+      }
+
+      return snapshot;
+    } catch (error: any) {
+      this.handleCorruption(error);
+      return {};
+    }
   }
 
   close(): void {
@@ -351,8 +548,18 @@ export class DbRepo {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
     }
-    this.flush();
-    this.db.close();
+    if (!this.isCorrupted) {
+      try {
+        this.flush();
+      } catch (error) {
+        logger.error({ error }, 'Error during final flush');
+      }
+    }
+    try {
+      this.db.close();
+    } catch (error) {
+      logger.error({ error }, 'Error closing database');
+    }
   }
 }
 
