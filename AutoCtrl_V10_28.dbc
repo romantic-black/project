@@ -1,0 +1,339 @@
+VERSION ""
+
+
+NS_ : 
+	NS_DESC_
+	CM_
+	BA_DEF_
+	BA_
+	VAL_
+	CAT_DEF_
+	CAT_
+	FILTER
+	BA_DEF_DEF_
+	EV_DATA_
+	ENVVAR_DATA_
+	SGTYPE_
+	SGTYPE_VAL_
+	BA_DEF_SGTYPE_
+	BA_SGTYPE_
+	SIG_TYPE_REF_
+	VAL_TABLE_
+	SIG_GROUP_
+	SIG_VALTYPE_
+	SIGTYPE_VALTYPE_
+	BO_TX_BU_
+	BA_DEF_REL_
+	BA_REL_
+	BA_DEF_DEF_REL_
+	BU_SG_REL_
+	BU_EV_REL_
+	BU_BO_REL_
+	SG_MUL_VAL_
+
+BS_:
+
+BU_: IPC_Land IPC_Sea VCU
+VAL_TABLE_ BrakeCondition 1 "AutoBrakeCondition 线控制动状态" 0 "NoBrakeCondition" ;
+VAL_TABLE_ normal 1 "Fault" 0 "normal" ;
+VAL_TABLE_ EHBFaultLevel 4 "四级故障" 3 "三级故障" 2 "二级故障" 1 "一级故障" 0 "无故障" ;
+VAL_TABLE_ EHBStatus 1 "Active" 0 "Not active" ;
+VAL_TABLE_ BrakingEnable 2 "Active braking" 1 "No braking" ;
+VAL_TABLE_ WaterInFuelIndicator 17 "Not available" 16 "Error" 1 "Yes" 0 "No" ;
+VAL_TABLE_ AmberWarningLampStatus 17 "Not available" 16 "Error" 1 "Lamp On" 0 "Lamp Off" ;
+VAL_TABLE_ RedStopLampStatus 17 "Not available" 16 "Error" 1 "Lamp On" 0 "Lamp Off" ;
+VAL_TABLE_ EngineWaitToStartLamp 17 "Not available" 16 "Error" 1 "On" 0 "Off" ;
+VAL_TABLE_ EngineStarterMode 4369 "not available" 4368 "error" 4353 "Error (legacy, use 1110)" 4352 "Starter inhibited(unknown)" 4113 "Reserved" 4112 "Reserved" 4097 "Reserved" 4096 "Starter inhibited (over-temp)" 273 "Starter inhibited (immobilizer)" 272 "StarterInhibited(driveline)" 257 "Starter inhibited (preheating)" 256 "Starter inhibited(engine runnin)" 17 "Start finish,inactive after 50ms" 16 "starter active, gear engaged" 1 "starter active, gear not engaged" 0 "start not requested" ;
+VAL_TABLE_ EngineTorqueMode 4369 "Not available " 4368 "Other " 4353 "not defined  " 4352 "Service procedure " 4113 "Remote accelerator" 4112 "Braking 
+
+system  " 4097 "High speed governor  " 4096 "Torque limiting  " 273 "ABS control" 272 "Transmission 
+
+control" 257 "ASR 
+
+control " 256 "Road speed governor  " 17 "PTO governor" 16 "Cruise Control" 1 "Accelerator pedal selection" 0 "Low idle governor/no request" ;
+VAL_TABLE_ M1Enable 1 "Enable" 0 "Disable" ;
+
+
+BO_ 262 IPC_Land_CtrlCmd: 8 IPC_Land
+ SG_ IPC_Land_Angle : 47|8@0+ (1,-90) [-90|90] "deg" Vector__XXX
+ SG_ IPC_Land_WorkMode : 35|4@0+ (1,0) [0|15] ""  VCU
+ SG_ IPC_Land_TakeOverReq : 39|2@0+ (1,0) [0|3] ""  VCU
+ SG_ IPC_Land_EPBReq : 37|2@0+ (1,0) [0|3] ""  VCU
+ SG_ IPC_Land_LifeCnt : 27|4@0+ (1,0) [0|15] ""  VCU
+ SG_ IPC_Land_CheckSum : 63|8@0+ (1,0) [0|255] ""  VCU
+ SG_ IPC_Land_TargetGear : 31|4@0+ (1,0) [0|15] ""  VCU
+ SG_ IPC_Land_TargetAngSpd : 7|12@0+ (0.1,-128) [-128|127] "deg/s"  VCU
+ SG_ IPC_Land_TargetSpd : 11|12@0+ (0.05,0) [0|60] "km/h"  VCU
+
+BO_ 321 VCU_Info2: 8 VCU
+ SG_ VCU_ErrLevel : 43|4@0+ (1,0) [0|15] "" Vector__XXX
+ SG_ VCU_ModeSwitchingFlag : 47|1@0+ (1,0) [0|1] "" Vector__XXX
+ SG_ VCU_ModeSwitchAvailFlag : 46|1@0+ (1,0) [0|1] "" Vector__XXX
+ SG_ VCU_FeulSts : 63|8@0+ (0.4,0) [0|100] "％"  IPC_Sea
+ SG_ VCU_BmsTemp : 39|8@0+ (1,-50) [-50|205] "℃"  IPC_Sea
+ SG_ VCU_OdoMeter : 7|32@0+ (0.1,0) [0|429496729.5] "km"  IPC_Sea
+
+BO_ 323 Hydsystem_Info: 8 VCU
+ SG_ Hyd_SprayPumpSts : 39|4@0+ (1,0) [0|15] ""  IPC_Sea
+ SG_ Hyd_SealingPlateSts : 35|4@0+ (1,0) [0|15] ""  IPC_Sea
+ SG_ Hyd_SteerWhlAngle : 19|12@0+ (0.1,-25) [-25|25] "deg"  IPC_Sea
+ SG_ Hyd_SternWingSts : 23|4@0+ (1,0) [0|15] ""  IPC_Sea
+ SG_ Hyd_LodgingAntennaSts : 15|4@0+ (1,0) [0|15] ""  IPC_Sea
+ SG_ Hyd_ReverseBucketSts : 11|4@0+ (1,0) [0|15] ""  IPC_Sea
+ SG_ Hyd_MainTrackSts : 7|4@0+ (1,0) [0|15] ""  IPC_Sea
+ SG_ Hyd_SubTrackSts : 3|4@0+ (1,0) [0|15] ""  IPC_Sea
+
+BO_ 341 J1939_EEC2: 8 VCU
+ SG_ EEC2_EngPcntLoadatCurSpd : 55|8@0+ (1,0) [0|125] "％"  IPC_Sea
+ SG_ EEC2_EngMaxAvailPcntTrq : 23|8@0+ (0.4,0) [0|100] "％"  IPC_Sea
+ SG_ EEC2_AccPdlPosition : 15|8@0+ (0.4,0) [0|100] "％"  IPC_Sea
+
+BO_ 342 J1939_DLCC1: 8 VCU
+ SG_ DLCC1_OBDMalfuncIndicatorLamp : 7|2@0+ (1,0) [0|3] ""  IPC_Sea
+ SG_ DLCC1_EngRedStopLamp : 5|2@0+ (1,0) [0|3] ""  IPC_Sea
+ SG_ DLCC1_EngOilPresLowLamp : 13|2@0+ (1,0) [0|3] ""  IPC_Sea
+ SG_ DLCC1_EngCoolantTempHighLamp : 15|2@0+ (1,0) [0|3] ""  IPC_Sea
+ SG_ DLCC1_EngCoolantLvlLowLamp : 25|2@0+ (1,0) [0|3] ""  IPC_Sea
+ SG_ DLCC1_EngAmberWarnLamp : 3|2@0+ (1,0) [0|3] ""  IPC_Sea
+ SG_ DLCC1_BrkActiveLamp : 17|2@0+ (1,0) [0|3] ""  IPC_Sea
+
+BO_ 340 J1939_EEC1: 8 VCU
+ SG_ EEC1_EngTrqMode : 7|4@0+ (1,0) [0|15] ""  IPC_Sea
+ SG_ EEC1_EngStarterMode : 55|4@0+ (1,0) [0|15] ""  IPC_Sea
+ SG_ EEC1_EngSpeed : 31|16@0+ (0.125,0) [0|8031.875] "rpm"  IPC_Sea
+ SG_ EEC1_DriverDemandPcntTrq : 63|8@0+ (1,-125) [-125|125] "％"  IPC_Sea
+ SG_ EEC1_DemandPcntTrq : 15|8@0+ (1,-125) [-125|125] "％"  IPC_Sea
+ SG_ EEC1_ActEngPcntTrq : 23|8@0+ (1,-125) [-125|125] "％"  IPC_Sea
+
+BO_ 337 ISG_Info2: 8 VCU
+ SG_ ISG_DCvoltage : 7|16@0+ (0.1,0) [0|1000] "V"  IPC_Sea
+ SG_ ISG_DCcurrent : 23|16@0+ (0.1,-1000) [-1000|1000] "A"  IPC_Sea
+
+BO_ 320 VCU_Info1: 8 VCU
+ SG_ VCU_VehAngSpeed : 51|12@0+ (0.1,-128) [-128|127] "deg/s" Vector__XXX
+ SG_ VCU_RCOnlineSts : 37|1@0+ (1,0) [0|1] ""  IPC_Sea
+ SG_ VCU_CurrentGear : 55|4@0+ (1,0) [0|15] ""  IPC_Sea
+ SG_ VCU_BrkPres : 47|8@0+ (0.1,0) [0|10] "Mpa"  IPC_Sea
+ SG_ VCU_ParkingSts : 35|4@0+ (1,0) [0|15] ""  IPC_Sea
+ SG_ VCU_IPCseaOnlineSts : 39|1@0+ (1,0) [0|1] ""  IPC_Sea
+ SG_ VCU_IPClandOnlineSts : 38|1@0+ (1,0) [0|1] ""  IPC_Sea
+ SG_ VCU_VehSpeed : 19|12@0+ (0.05,0) [0|200] "km/h"  IPC_Sea
+ SG_ VCU_BatSOC : 15|12@0+ (0.1,0) [0|100] "％"  IPC_Sea
+ SG_ VCU_Mode : 7|4@0+ (1,0) [0|15] ""  IPC_Sea
+ SG_ VCU_LifeCnt : 3|4@0+ (1,0) [0|15] ""  IPC_Sea
+
+BO_ 336 ISG_Info1: 8 VCU
+ SG_ ISG_LifeCnt : 59|4@0+ (1,0) [0|15] ""  IPC_Sea
+ SG_ ISG_FaultLevel : 63|4@0+ (1,0) [0|15] ""  IPC_Sea
+ SG_ ISG_ActTrq : 39|16@0+ (0.1,-3000) [-3000|3000] "Nm"  IPC_Sea
+ SG_ ISG_ActSpeed : 23|16@0+ (1,-12000) [-12000|12000] "rpm"  IPC_Sea
+ SG_ ISG_ActMode : 54|5@0+ (1,0) [0|31] ""  IPC_Sea
+ SG_ ISG_ActEnSts : 55|1@0+ (1,0) [0|1] ""  IPC_Sea
+ SG_ ISG_MaxTrq : 7|16@0+ (0.1,-3000) [-3000|3000] "Nm"  IPC_Sea
+
+BO_ 278 IPC_Sea_CtrlCmd: 8 IPC_Sea
+ SG_ IPC_Sea_WorkMode : 35|4@0+ (1,0) [0|15] ""  VCU
+ SG_ IPC_Sea_ReverseReq : 39|2@0+ (1,0) [0|3] ""  VCU
+ SG_ IPC_Sea_PwrCtrlMode : 31|2@0+ (1,0) [0|3] ""  VCU
+ SG_ IPC_Sea_CheckSum : 63|8@0+ (1,0) [0|255] ""  VCU
+ SG_ IPC_Sea_TakeOverReq : 29|2@0+ (1,0) [0|3] ""  VCU
+ SG_ IPC_Sea_LifeCnt : 27|4@0+ (1,0) [0|15] ""  VCU
+ SG_ IPC_Sea_Target_Throttle : 11|12@0+ (0.05,0) [0|100] "％"  VCU
+ SG_ IPC_Sea_Target_Angle : 7|12@0+ (0.1,-200) [-200|200] "deg"  VCU
+
+
+
+CM_ SG_ 262 IPC_Land_Angle "陆上控制器反馈当前角度信号";
+CM_ SG_ 262 IPC_Land_WorkMode "陆上控制器工作模式
+0-平路
+1-越野
+2-越障
+3-爬坡
+4-越壕
+5-陆上切换沙滩
+6-沙滩切换陆上";
+CM_ SG_ 262 IPC_Land_TakeOverReq "陆上控制器接管请求
+0-不接管
+1-请求接管
+2、3-预留";
+CM_ SG_ 262 IPC_Land_EPBReq "陆上控制器EPB请求
+0-无效
+1-拉起
+2-释放
+3-预留";
+CM_ SG_ 262 IPC_Land_LifeCnt "陆上控制器计数信号";
+CM_ SG_ 262 IPC_Land_CheckSum "陆上控制器校验
+Byte0 XOR Byte1 XOR Byte2 XOR Byte3 XOR Byte4 XOR Byte5 XOR Byte6 XOR Byte7 ";
+CM_ SG_ 262 IPC_Land_TargetGear "陆上控制器挡位请求
+0-N挡
+1-D挡
+2-R挡
+3~15-预留";
+CM_ SG_ 262 IPC_Land_TargetAngSpd "陆上控制器目标角速度请求";
+CM_ SG_ 262 IPC_Land_TargetSpd "陆上控制器目标速度请求";
+CM_ BO_ 321 "VCU反馈信息2";
+CM_ SG_ 321 VCU_ErrLevel "整车故障等级
+0-Normal
+1-Level 1
+2-Level 2
+3-Level 3";
+CM_ SG_ 321 VCU_ModeSwitchingFlag "VCU反馈模式切换中Flag
+0-Not Switching
+1-Switching";
+CM_ SG_ 321 VCU_ModeSwitchAvailFlag "VCU反馈模式可切换Flag
+0-Not Available
+1-Available";
+CM_ SG_ 321 VCU_FeulSts "VCU反馈燃料剩余状态";
+CM_ SG_ 321 VCU_BmsTemp "VCU反馈BMS温度";
+CM_ SG_ 321 VCU_OdoMeter "VCU里程计信息";
+CM_ SG_ 323 Hyd_SprayPumpSts "喷泵工作状态
+0-未工作
+1-工作";
+CM_ SG_ 323 Hyd_SealingPlateSts "轮穴封板状态
+0-无效
+1-收拢状态(0度)
+2-展开状态(270度)";
+CM_ SG_ 323 Hyd_SteerWhlAngle "转舵反馈角度";
+CM_ SG_ 323 Hyd_SternWingSts "艉翼板状态反馈
+0-不工作(收拢状态)
+1-工作";
+CM_ SG_ 323 Hyd_LodgingAntennaSts "倒伏天线状态
+0-无效
+1-下方到位
+2-立起到位
+3-未知状态";
+CM_ SG_ 323 Hyd_ReverseBucketSts "倒车斗状态反馈
+0-无效
+1-回收到位
+2-下放到位
+3-未知状态";
+CM_ SG_ 323 Hyd_MainTrackSts "履带系统大轮状态
+0-未知
+1-提升锁死
+2-落地锁死
+3-提升减震
+4-落地减震";
+CM_ SG_ 323 Hyd_SubTrackSts "履带系统小轮状态反馈
+0-未知
+1-提升锁死
+2-落地锁死
+3-提升减震
+4-落地减震";
+CM_ SG_ 341 EEC2_EngPcntLoadatCurSpd "当前转速负荷百分比";
+CM_ SG_ 341 EEC2_EngMaxAvailPcntTrq "实际最大可利用发动机扭矩百分比";
+CM_ SG_ 341 EEC2_AccPdlPosition "油门踏板1开度";
+CM_ SG_ 342 DLCC1_OBDMalfuncIndicatorLamp "车载诊断故障指示灯";
+CM_ SG_ 342 DLCC1_EngRedStopLamp "发动机红色停车灯";
+CM_ SG_ 342 DLCC1_EngOilPresLowLamp "机油压力低报警灯";
+CM_ SG_ 342 DLCC1_EngCoolantTempHighLamp "发动机冷却液温度高指示灯";
+CM_ SG_ 342 DLCC1_EngCoolantLvlLowLamp "发动机冷却液液位低指示灯";
+CM_ SG_ 342 DLCC1_EngAmberWarnLamp "发动机琥珀色告警指示灯";
+CM_ SG_ 342 DLCC1_BrkActiveLamp "排气制动指示灯";
+CM_ SG_ 340 EEC1_EngTrqMode "发动机扭矩模式";
+CM_ SG_ 340 EEC1_EngStarterMode "发动机起动机模式";
+CM_ SG_ 340 EEC1_EngSpeed "发动机转速";
+CM_ SG_ 340 EEC1_DriverDemandPcntTrq "驾驶员需求扭矩百分比";
+CM_ SG_ 340 EEC1_DemandPcntTrq "发动机需求扭矩百分比";
+CM_ SG_ 340 EEC1_ActEngPcntTrq "发动机实际扭矩百分比";
+CM_ BO_ 337 "ISG电机反馈2";
+CM_ SG_ 337 ISG_DCvoltage "ISG电机母线电压";
+CM_ SG_ 337 ISG_DCcurrent "ISG电机实际电流";
+CM_ BO_ 320 "VCU反馈信息1";
+CM_ SG_ 320 VCU_VehAngSpeed "VCU反馈当前角速度";
+CM_ SG_ 320 VCU_RCOnlineSts "VCU反馈遥控器在线标志位
+0-不在线
+1-在线";
+CM_ SG_ 320 VCU_CurrentGear "VCU反馈当前挡位
+0-N挡
+1-D挡
+2-R挡
+3~15-预留";
+CM_ SG_ 320 VCU_BrkPres "VCU反馈当前制动压力";
+CM_ SG_ 320 VCU_ParkingSts "VCU反馈驻车状态";
+CM_ SG_ 320 VCU_IPCseaOnlineSts "VCU反馈水上控制器在线标志位
+0-不在线
+1-在线";
+CM_ SG_ 320 VCU_IPClandOnlineSts "VCU反馈陆上控制器在线标志位
+0-不在线
+1-在线";
+CM_ SG_ 320 VCU_VehSpeed "VCU反馈当前车速";
+CM_ SG_ 320 VCU_BatSOC "VCU反馈当前电量";
+CM_ SG_ 320 VCU_Mode "VCU反馈当前工作模式
+0-Init Mode
+1-Standby Mode
+2-Manual Land Mode
+3-Manual Sea Mode
+4-Auto Land Mode
+5-Auto Sea Mode
+6-Switching Mode
+F-Emergency Mode";
+CM_ SG_ 320 VCU_LifeCnt "VCU生命信号
+0~15循环递增";
+CM_ BO_ 336 "ISG电机反馈1";
+CM_ SG_ 336 ISG_LifeCnt "ISG电机心跳信号";
+CM_ SG_ 336 ISG_FaultLevel "ISG电机故障等级
+0-无故障
+1-一般严重故障，报警
+2-较严重故障
+3-严重故障";
+CM_ SG_ 336 ISG_ActTrq "ISG电机实际扭矩";
+CM_ SG_ 336 ISG_ActSpeed "ISG电机实际转速";
+CM_ SG_ 336 ISG_ActMode "ISG电机实际模式
+0-关闭
+1-扭矩模式 
+2-转速模式 
+4-主动放电模式";
+CM_ SG_ 336 ISG_ActEnSts "ISG电机使能状态:
+0-未使能,1-使能";
+CM_ SG_ 336 ISG_MaxTrq "ISG最大允许扭矩";
+CM_ SG_ 278 IPC_Sea_WorkMode "水上控制器工作模式
+0-水上
+1-水上切换沙滩
+2-沙滩切换水上";
+CM_ SG_ 278 IPC_Sea_ReverseReq "水上控制器倒车斗下放请求
+0-无效
+1-请求下放
+2-请求回收
+3-预留";
+CM_ SG_ 278 IPC_Sea_PwrCtrlMode "水上控制器目标动力模式
+0-水上静默模式
+1-水上巡航模式
+2-水上高速模式
+3-预留";
+CM_ SG_ 278 IPC_Sea_CheckSum "水上控制器校验
+Byte0 XOR Byte1 XOR Byte2 XOR Byte3 XOR Byte4 XOR Byte5 XOR Byte6 XOR Byte7 ";
+CM_ SG_ 278 IPC_Sea_TakeOverReq "水上控制器接管请求
+0-不接管
+1-请求接管
+2、3-预留";
+CM_ SG_ 278 IPC_Sea_LifeCnt "水上控制器生命信号
+0~15循环递增";
+CM_ SG_ 278 IPC_Sea_Target_Throttle "水上控制器目标油门开度";
+CM_ SG_ 278 IPC_Sea_Target_Angle "水上控制器目标转向角度";
+BA_DEF_ BO_  "GenSigStartValue" FLOAT 0 30000;
+BA_DEF_ BO_  "GenMsgSendType" ENUM  "cyclic";
+BA_DEF_ BO_  "GenMsgDelayTime" FLOAT 0 30000;
+BA_DEF_ BO_  "GenMsgCycleTime" FLOAT 0 30000;
+BA_DEF_ BU_  "ECU" STRING ;
+BA_DEF_  "BaudRate" FLOAT 0 1000000;
+BA_DEF_  "BusType" STRING ;
+BA_DEF_DEF_  "GenSigStartValue" 0;
+BA_DEF_DEF_  "GenMsgSendType" "cyclic";
+BA_DEF_DEF_  "GenMsgDelayTime" 0;
+BA_DEF_DEF_  "GenMsgCycleTime" 20;
+BA_DEF_DEF_  "ECU" "";
+BA_DEF_DEF_  "BaudRate" 500000;
+BA_DEF_DEF_  "BusType" "CAN";
+BA_ "GenMsgCycleTime" BO_ 321 100;
+BA_ "GenMsgCycleTime" BO_ 341 10;
+BA_ "GenMsgCycleTime" BO_ 342 100;
+BA_ "GenMsgCycleTime" BO_ 340 10;
+VAL_ 340 EEC1_EngTrqMode 15 "Not available " 14 "Other " 13 "not defined  " 12 "Service procedure " 11 "Remote accelerator" 10 "Braking 
+
+system  " 9 "High speed governor  " 8 "Torque limiting  " 7 "ABS control" 6 "Transmission 
+
+control" 5 "ASR 
+
+control " 4 "Road speed governor  " 3 "PTO governor" 2 "Cruise Control" 1 "Accelerator pedal selection" 0 "Low idle governor/no request" ;
+VAL_ 340 EEC1_EngStarterMode 15 "not available" 14 "error" 13 "Error (legacy, use 1110)" 12 "Starter inhibited(unknown)" 11 "Reserved" 10 "Reserved" 9 "Reserved" 8 "Starter inhibited (over-temp)" 7 "Starter inhibited (immobilizer)" 6 "StarterInhibited(driveline)" 5 "Starter inhibited (preheating)" 4 "Starter inhibited(engine runnin)" 3 "Start finish,inactive after 50ms" 2 "starter active, gear engaged" 1 "starter active, gear not engaged" 0 "start not requested" ;
+

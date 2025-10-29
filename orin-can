@@ -1,0 +1,57 @@
+###########遥控器无人模式102#3B xx xx
+###########遥控器遥控模式102#37 xx xx
+
+###  重新启动can0  ###
+sudo ip link set can0 down
+sudo ip link set can0 type can bitrate 500000
+sudo ip link set can0 up
+
+###  单帧发送  ###
+cansend can0 106#0000000040000000
+cansend can0 116#0000001000000000
+
+###  收报文  ###
+candump can0
+
+###  筛选单个ID  ###
+candump can0,106:1FFFF
+candump can0,116:1FFFF
+# 只显示ID106的信息
+candump can0,262:1FFFF
+
+###########模式切换请求，切换前需置0
+cangen can0 -I 116 -D 0000001000000000 -g 20
+cangen can0 -I 116 -D 0000000000000000 -g 20
+cangen can0 -I 106 -D 0000000040000000 -g 20
+cangen can0 -I 106 -D 0000000000000000 -g 20
+
+##### 陆上发送接管请求，响应vcu工作模式140第一字节后四位
+while true; do
+cansend can0 106#0000000040000000
+sleep 0.02
+done
+#### 陆上取消接管
+while true; do
+cansend can0 106#0000000000000000
+sleep 0.02
+done
+##### 陆上发送速度请求，（接管请求同时发）轮毂电机mcu反馈转矩请求
+while true; do
+cansend can0 106#C800000040000000
+sleep 0.02
+done
+##### 水上发送接管请求，响应vcu工作模式140第一字节后四位
+while true; do
+cansend can0 116#0000001000000000
+sleep 0.02
+done
+#### 水上取消接管
+while true; do
+cansend can0 116#0000000000000000
+sleep 0.02
+done
+##### 水上发送油门10，（接管请求同时发）发动机转速通过isg电机报文读取转速rpm值
+while true; do
+cansend can0 116#0000C81000000000
+sleep 0.02
+done
