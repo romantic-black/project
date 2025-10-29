@@ -4,6 +4,7 @@ import { SignalCard } from '../components/SignalCard';
 import { ChartContainer } from '../components/ChartContainer';
 import { getValTableText } from '../utils/dbc';
 import * as echarts from 'echarts';
+import { useSignalHistory } from '../hooks/useSignalHistory';
 
 export default function Engine() {
   const { getSignal } = useTelemetryStore();
@@ -12,6 +13,10 @@ export default function Engine() {
   const speed = getSignal('EEC1_EngSpeed');
   const load = getSignal('EEC2_EngPcntLoadatCurSpd');
   const throttle = getSignal('EEC2_AccPdlPosition');
+  const torqueHistory = useSignalHistory('EEC1_ActEngPcntTrq');
+  const speedHistory = useSignalHistory('EEC1_EngSpeed');
+  const loadHistory = useSignalHistory('EEC2_EngPcntLoadatCurSpd');
+  const throttleHistory = useSignalHistory('EEC2_AccPdlPosition');
   const trqMode = getSignal('EEC1_EngTrqMode');
   const starterMode = getSignal('EEC1_EngStarterMode');
   const demandTrq = getSignal('EEC1_DemandPcntTrq');
@@ -44,30 +49,39 @@ export default function Engine() {
         {
           name: '扭矩',
           type: 'line',
-          data: [{ time: Date.now(), value: torque || 0 }],
+          smooth: true,
+          showSymbol: false,
+          areaStyle: { opacity: 0.15 },
+          data: torqueHistory.map((item) => [item.timestamp, item.value]),
           yAxisIndex: 0,
         },
         {
           name: '转速',
           type: 'line',
-          data: [{ time: Date.now(), value: speed || 0 }],
+          smooth: true,
+          showSymbol: false,
+          data: speedHistory.map((item) => [item.timestamp, item.value]),
           yAxisIndex: 1,
         },
         {
           name: '负载',
           type: 'line',
-          data: [{ time: Date.now(), value: load || 0 }],
+          smooth: true,
+          showSymbol: false,
+          data: loadHistory.map((item) => [item.timestamp, item.value]),
           yAxisIndex: 0,
         },
         {
           name: '油门',
           type: 'line',
-          data: [{ time: Date.now(), value: throttle || 0 }],
+          smooth: true,
+          showSymbol: false,
+          data: throttleHistory.map((item) => [item.timestamp, item.value]),
           yAxisIndex: 0,
         },
       ],
     }),
-    [torque, speed, load, throttle]
+    [loadHistory, speedHistory, throttleHistory, torqueHistory]
   );
 
   return (

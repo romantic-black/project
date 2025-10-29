@@ -3,12 +3,15 @@ import { useTelemetryStore } from '../stores/telemetry';
 import { SignalCard } from '../components/SignalCard';
 import { ChartContainer } from '../components/ChartContainer';
 import * as echarts from 'echarts';
+import { useSignalHistory } from '../hooks/useSignalHistory';
 
 export default function ISG() {
   const { getSignal } = useTelemetryStore();
 
   const voltage = getSignal('ISG_DCvoltage');
   const current = getSignal('ISG_DCcurrent');
+  const voltageHistory = useSignalHistory('ISG_DCvoltage');
+  const currentHistory = useSignalHistory('ISG_DCcurrent');
   const power = useMemo(() => {
     if (voltage !== undefined && current !== undefined) {
       return (voltage * current) / 1000;
@@ -16,8 +19,28 @@ export default function ISG() {
     return undefined;
   }, [voltage, current]);
 
+  const powerHistory = useMemo(() => {
+    const length = Math.min(voltageHistory.length, currentHistory.length);
+    if (length === 0) {
+      return [];
+    }
+
+    const voltageSlice = voltageHistory.slice(-length);
+    const currentSlice = currentHistory.slice(-length);
+
+    return voltageSlice.map((voltagePoint, index) => {
+      const currentPoint = currentSlice[index];
+      return {
+        timestamp: Math.max(voltagePoint.timestamp, currentPoint.timestamp),
+        value: (voltagePoint.value * currentPoint.value) / 1000,
+      };
+    });
+  }, [currentHistory, voltageHistory]);
+
   const speed = getSignal('ISG_ActSpeed');
   const torque = getSignal('ISG_ActTrq');
+  const speedHistory = useSignalHistory('ISG_ActSpeed');
+  const torqueHistory = useSignalHistory('ISG_ActTrq');
   const maxTorque = getSignal('ISG_MaxTrq');
   const mode = getSignal('ISG_ActMode');
   const enabled = getSignal('ISG_ActEnSts');
@@ -49,18 +72,23 @@ export default function ISG() {
         {
           name: '转速',
           type: 'line',
-          data: [{ time: Date.now(), value: speed || 0 }],
+          smooth: true,
+          showSymbol: false,
+          data: speedHistory.map((item) => [item.timestamp, item.value]),
           yAxisIndex: 0,
         },
         {
           name: '扭矩',
           type: 'line',
-          data: [{ time: Date.now(), value: torque || 0 }],
+          smooth: true,
+          showSymbol: false,
+          areaStyle: { opacity: 0.15 },
+          data: torqueHistory.map((item) => [item.timestamp, item.value]),
           yAxisIndex: 1,
         },
       ],
     }),
-    [speed, torque]
+    [speedHistory, torqueHistory]
   );
 
   const powerChartOption: echarts.EChartsOption = useMemo(
@@ -90,24 +118,31 @@ export default function ISG() {
         {
           name: '电压',
           type: 'line',
-          data: [{ time: Date.now(), value: voltage || 0 }],
+          smooth: true,
+          showSymbol: false,
+          data: voltageHistory.map((item) => [item.timestamp, item.value]),
           yAxisIndex: 0,
         },
         {
           name: '电流',
           type: 'line',
-          data: [{ time: Date.now(), value: current || 0 }],
+          smooth: true,
+          showSymbol: false,
+          data: currentHistory.map((item) => [item.timestamp, item.value]),
           yAxisIndex: 1,
         },
         {
           name: '功率',
           type: 'line',
-          data: [{ time: Date.now(), value: power || 0 }],
+          smooth: true,
+          showSymbol: false,
+          areaStyle: { opacity: 0.15 },
+          data: powerHistory.map((item) => [item.timestamp, item.value]),
           yAxisIndex: 1,
         },
       ],
     }),
-    [voltage, current, power]
+    [currentHistory, powerHistory, voltageHistory]
   );
 
   return (

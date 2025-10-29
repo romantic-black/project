@@ -2,14 +2,16 @@ import { useMemo } from 'react';
 import { useTelemetryStore } from '../stores/telemetry';
 import { SignalCard } from '../components/SignalCard';
 import { ChartContainer } from '../components/ChartContainer';
-import { getValTableText } from '../utils/dbc';
 import * as echarts from 'echarts';
+import { useSignalHistory } from '../hooks/useSignalHistory';
 
 export default function VCU() {
   const { getSignal } = useTelemetryStore();
 
   const angSpeed = getSignal('VCU_VehAngSpeed');
   const brkPres = getSignal('VCU_BrkPres');
+  const angSpeedHistory = useSignalHistory('VCU_VehAngSpeed');
+  const brkPresHistory = useSignalHistory('VCU_BrkPres');
   const parking = getSignal('VCU_ParkingSts');
   const modeSwitchFlag = getSignal('VCU_ModeSwitchingFlag');
   const modeSwitchAvail = getSignal('VCU_ModeSwitchAvailFlag');
@@ -42,18 +44,23 @@ export default function VCU() {
         {
           name: '角速度',
           type: 'line',
-          data: [{ time: Date.now(), value: angSpeed || 0 }],
+          smooth: true,
+          showSymbol: false,
+          data: angSpeedHistory.map((item) => [item.timestamp, item.value]),
           yAxisIndex: 0,
         },
         {
           name: '制动压力',
           type: 'line',
-          data: [{ time: Date.now(), value: brkPres || 0 }],
+          smooth: true,
+          showSymbol: false,
+          areaStyle: { opacity: 0.15 },
+          data: brkPresHistory.map((item) => [item.timestamp, item.value]),
           yAxisIndex: 1,
         },
       ],
     }),
-    [angSpeed, brkPres]
+    [angSpeedHistory, brkPresHistory]
   );
 
   return (

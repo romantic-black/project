@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist-test",
+    "noEmit": false,
+    "moduleResolution": "nodenext",
+    "module": "nodenext",
+    "target": "ES2020",
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": false,
+    "baseUrl": "./",
+    "paths": {
+      "@can-telemetry/common": ["../../packages/common/src/index.ts"]
+    },
+    "lib": ["ES2022"],
+    "types": []
+  },
+  "include": [],
+  "files": [
+    "src/stores/telemetry.ts",
+    "src/stores/telemetry.test.ts",
+    "src/types/test-shims.d.ts"
+  ],
+  "references": [{ "path": "../../packages/common" }]
+}
