@@ -21,7 +21,6 @@ export default function Dashboard() {
   const gear = getSignal('VCU_CurrentGear');
   const mode = getSignal('VCU_Mode');
   const errLevel = getSignal('VCU_ErrLevel');
-  const connected = useTelemetryStore((s) => s.connected);
 
   const speedGaugeOption: echarts.EChartsOption = useMemo(
     () => ({
@@ -97,11 +96,12 @@ export default function Dashboard() {
           position: 'right',
         },
       ],
+      animation: false,
       series: [
         {
           name: '车速',
           type: 'line',
-          smooth: true,
+          smooth: false,
           showSymbol: false,
           areaStyle: { opacity: 0.2 },
           data: speedHistory.map((item) => [item.timestamp, item.value]),
@@ -109,7 +109,7 @@ export default function Dashboard() {
         {
           name: '转速',
           type: 'line',
-          smooth: true,
+          smooth: false,
           showSymbol: false,
           yAxisIndex: 1,
           data: rpmHistory.map((item) => [item.timestamp, item.value]),

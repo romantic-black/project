@@ -71,31 +71,39 @@ export default function ISG() {
           position: 'right',
         },
       ],
+      animation: false,
       series: [
         {
           name: '转速',
           type: 'line',
-          smooth: true,
+          smooth: false,
           showSymbol: false,
-          data: speedHistory.map((item) => [item.timestamp, item.value]),
-          data: isgInfo1Timestamp ? [[isgInfo1Timestamp, speed ?? 0]] : [],
+          data: [
+            ...speedHistory.map((item) => [item.timestamp, item.value]),
+            ...(isgInfo1Timestamp ? [[isgInfo1Timestamp, speed ?? 0]] : []),
+          ],
           yAxisIndex: 0,
         },
         {
           name: '扭矩',
           type: 'line',
-          smooth: true,
+          smooth: false,
           showSymbol: false,
           areaStyle: { opacity: 0.15 },
-          data: torqueHistory.map((item) => [item.timestamp, item.value]),
-          data: isgInfo1Timestamp ? [[isgInfo1Timestamp, torque ?? 0]] : [],
+          data: [
+            ...torqueHistory.map((item) => [item.timestamp, item.value]),
+            ...(isgInfo1Timestamp ? [[isgInfo1Timestamp, torque ?? 0]] : []),
+          ],
           yAxisIndex: 1,
         },
       ],
-    }),
-    [speedHistory, torqueHistory]
-    [speed, torque, isgInfo1Timestamp]
-  );
+  }), [
+    speedHistory,
+    torqueHistory,
+    speed,
+    torque,
+    isgInfo1Timestamp,
+  ]);
 
   const powerChartOption: echarts.EChartsOption = useMemo(
     () => ({
@@ -120,40 +128,52 @@ export default function ISG() {
           position: 'right',
         },
       ],
+      animation: false,
       series: [
         {
           name: '电压',
           type: 'line',
-          smooth: true,
+          smooth: false,
           showSymbol: false,
-          data: voltageHistory.map((item) => [item.timestamp, item.value]),
-          data: isgInfo2Timestamp ? [[isgInfo2Timestamp, voltage ?? 0]] : [],
+          data: [
+            ...voltageHistory.map((item) => [item.timestamp, item.value]),
+            ...(isgInfo2Timestamp ? [[isgInfo2Timestamp, voltage ?? 0]] : []),
+          ],
           yAxisIndex: 0,
         },
         {
           name: '电流',
           type: 'line',
-          smooth: true,
+          smooth: false,
           showSymbol: false,
-          data: currentHistory.map((item) => [item.timestamp, item.value]),
-          data: isgInfo2Timestamp ? [[isgInfo2Timestamp, current ?? 0]] : [],
+          data: [
+            ...currentHistory.map((item) => [item.timestamp, item.value]),
+            ...(isgInfo2Timestamp ? [[isgInfo2Timestamp, current ?? 0]] : []),
+          ],
           yAxisIndex: 1,
         },
         {
           name: '功率',
           type: 'line',
-          smooth: true,
+          smooth: false,
           showSymbol: false,
           areaStyle: { opacity: 0.15 },
-          data: powerHistory.map((item) => [item.timestamp, item.value]),
-          data: isgInfo2Timestamp ? [[isgInfo2Timestamp, power ?? 0]] : [],
+          data: [
+            ...powerHistory.map((item) => [item.timestamp, item.value]),
+            ...(isgInfo2Timestamp ? [[isgInfo2Timestamp, power ?? 0]] : []),
+          ],
           yAxisIndex: 1,
         },
       ],
-    }),
-    [currentHistory, powerHistory, voltageHistory]
-    [voltage, current, power, isgInfo2Timestamp]
-  );
+  }), [
+    currentHistory,
+    powerHistory,
+    voltageHistory,
+    voltage,
+    current,
+    power,
+    isgInfo2Timestamp,
+  ]);
 
   return (
     <div className="px-4 sm:px-6 lg:px-8">

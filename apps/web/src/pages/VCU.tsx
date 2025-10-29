@@ -42,30 +42,34 @@ export default function VCU() {
           position: 'right',
         },
       ],
+      animation: false,
       series: [
         {
           name: '角速度',
           type: 'line',
-          smooth: true,
+          smooth: false,
           showSymbol: false,
-          data: angSpeedHistory.map((item) => [item.timestamp, item.value]),
-          data: vcuInfo1Timestamp ? [[vcuInfo1Timestamp, angSpeed ?? 0]] : [],
+          data: [
+            ...angSpeedHistory.map((item) => [item.timestamp, item.value]),
+            ...(vcuInfo1Timestamp ? [[vcuInfo1Timestamp, angSpeed ?? 0]] : []),
+          ],
           yAxisIndex: 0,
         },
         {
           name: '制动压力',
           type: 'line',
-          smooth: true,
+          smooth: false,
           showSymbol: false,
           areaStyle: { opacity: 0.15 },
-          data: brkPresHistory.map((item) => [item.timestamp, item.value]),
-          data: vcuInfo1Timestamp ? [[vcuInfo1Timestamp, brkPres ?? 0]] : [],
+          data: [
+            ...brkPresHistory.map((item) => [item.timestamp, item.value]),
+            ...(vcuInfo1Timestamp ? [[vcuInfo1Timestamp, brkPres ?? 0]] : []),
+          ],
           yAxisIndex: 1,
         },
       ],
     }),
-    [angSpeedHistory, brkPresHistory]
-    [angSpeed, brkPres, vcuInfo1Timestamp]
+    [angSpeedHistory, brkPresHistory, angSpeed, brkPres, vcuInfo1Timestamp]
   );
 
   return (
