@@ -9,9 +9,11 @@ import { normalizeFrame } from './pipeline/normalize.js';
 import { dbRepo } from './db/repo.js';
 import { WSServer } from './api/ws.js';
 import { setupRestApi } from './api/rest.js';
-import pino from 'pino';
+import { createLogger } from './utils/logger.js';
+import { validateConfig } from './utils/config-validator.js';
+import { performanceManager } from './performance/manager.js';
 
-const logger = pino({ level: config.LOG_LEVEL });
+const logger = createLogger('main');
 
 let canSource: ICanSource;
 
@@ -30,12 +32,28 @@ function createCanSource(): ICanSource {
 }
 
 async function main() {
-  logger.info({ config }, 'Starting server');
+  // Validate configuration
+  const validation = validateConfig();
+  if (!validation.valid) {
+    logger.error('Configuration validation failed', { errors: validation.errors });
+    process.exit(1);
+  }
+  if (validation.warnings.length > 0) {
+    logger.warn('Configuration validation warnings', { warnings: validation.warnings });
+  }
+
+  logger.info('Starting server', { 
+    dataMode: config.DATA_MODE,
+    performanceMode: performanceManager.getMode(),
+    wsPort: config.WS_PORT,
+    httpPort: config.HTTP_PORT,
+  });
 
   canSource = createCanSource();
   (globalThis as any).canSource = canSource;
 
   const wss = new WSServer(config.WS_PORT);
+  (globalThis as any).wss = wss; // Make accessible to REST API
   const app = express();
   setupRestApi(app);
 

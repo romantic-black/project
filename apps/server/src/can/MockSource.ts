@@ -8,11 +8,13 @@ export class MockSource implements ICanSource {
   private intervals: NodeJS.Timeout[] = [];
   private statsState: SourceStats = { frames: 0, errors: 0 };
   private isRunning = false;
+  private lifeCntCache = new Map<number, number>();
 
   async start(): Promise<void> {
     if (this.isRunning) return;
     this.isRunning = true;
     this.statsState = { frames: 0, errors: 0 };
+    this.lifeCntCache.clear();
 
     let messages: any[] = [];
     try {
@@ -35,7 +37,13 @@ export class MockSource implements ICanSource {
         const data = Buffer.alloc(msg.length || 8);
         data.fill(0); // Initialize with zeros
 
+        // First pass: encode all signals except LifeCnt and CheckSum
         for (const signal of msg.signals || []) {
+          // Skip LifeCnt and CheckSum in first pass
+          if (signal.name.includes('LifeCnt') || signal.name.includes('CheckSum')) {
+            continue;
+          }
+
           try {
             // Generate a random physical value within min/max range
             const min = signal.min ?? 0;
@@ -69,6 +77,80 @@ export class MockSource implements ICanSource {
             encodeBits(data, startBit, length, clampedRawValue, bigEndian);
           } catch (error) {
             console.warn(`Failed to encode signal ${signal.name} in message ${msg.name}:`, error);
+          }
+        }
+
+        // Second pass: handle LifeCnt signals
+        for (const signal of msg.signals || []) {
+          if (!signal.name.includes('LifeCnt')) continue;
+
+          try {
+            const previous = this.lifeCntCache.get(msg.id) ?? 0;
+            const newLifeCnt = (previous + 1) % 16;
+            
+            const factor = signal.factor ?? 1;
+            const offset = signal.offset ?? 0;
+            const rawValue = inverseScale(newLifeCnt, factor, offset);
+
+            const startBit = signal.startBit ?? 0;
+            const length = signal.length ?? 8;
+            const bigEndian = isBigEndian(signal.endianness);
+
+            if (length > 53) {
+              console.warn(
+                `Skipping signal ${signal.name} in message ${msg.name}: length ${length} exceeds 53-bit limit`
+              );
+              continue;
+            }
+
+            const isSigned = signal.signed ?? (signal.min ?? 0) < 0;
+            const maxRawValue = isSigned ? Math.pow(2, length - 1) - 1 : Math.pow(2, length) - 1;
+            const minRawValue = isSigned ? -Math.pow(2, length - 1) : 0;
+            const clampedRawValue = Math.max(minRawValue, Math.min(maxRawValue, rawValue));
+
+            encodeBits(data, startBit, length, clampedRawValue, bigEndian);
+            
+            // Update cache
+            this.lifeCntCache.set(msg.id, newLifeCnt);
+          } catch (error) {
+            console.warn(`Failed to encode LifeCnt signal ${signal.name} in message ${msg.name}:`, error);
+          }
+        }
+
+        // Third pass: calculate and encode CheckSum (XOR of first 7 bytes)
+        for (const signal of msg.signals || []) {
+          if (!signal.name.includes('CheckSum')) continue;
+
+          try {
+            // Calculate XOR of first 7 bytes
+            let xor = 0;
+            for (let i = 0; i < 7; i++) {
+              xor ^= data[i];
+            }
+
+            const factor = signal.factor ?? 1;
+            const offset = signal.offset ?? 0;
+            const rawValue = inverseScale(xor, factor, offset);
+
+            const startBit = signal.startBit ?? 0;
+            const length = signal.length ?? 8;
+            const bigEndian = isBigEndian(signal.endianness);
+
+            if (length > 53) {
+              console.warn(
+                `Skipping signal ${signal.name} in message ${msg.name}: length ${length} exceeds 53-bit limit`
+              );
+              continue;
+            }
+
+            const isSigned = signal.signed ?? (signal.min ?? 0) < 0;
+            const maxRawValue = isSigned ? Math.pow(2, length - 1) - 1 : Math.pow(2, length) - 1;
+            const minRawValue = isSigned ? -Math.pow(2, length - 1) : 0;
+            const clampedRawValue = Math.max(minRawValue, Math.min(maxRawValue, rawValue));
+
+            encodeBits(data, startBit, length, clampedRawValue, bigEndian);
+          } catch (error) {
+            console.warn(`Failed to encode CheckSum signal ${signal.name} in message ${msg.name}:`, error);
           }
         }
 

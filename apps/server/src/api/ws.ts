@@ -1,9 +1,11 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import type { MessageData } from '@can-telemetry/common';
-import pino from 'pino';
 import config from '../config.js';
+import { createLogger } from '../utils/logger.js';
+import { transportMonitor } from '../db/transport-monitor.js';
+import { performanceManager } from '../performance/manager.js';
 
-const logger = pino({ level: config.LOG_LEVEL });
+const logger = createLogger('ws-server');
 
 interface WsClient extends WebSocket {
   subscribedTopics?: Set<string>;
@@ -15,11 +17,27 @@ export class WSServer {
   private messageBuffer: Map<string, MessageData> = new Map();
   private bufferMaxSize = 1000;
   private heartbeatInterval?: NodeJS.Timeout;
+  private messageSequence = 0;
 
   constructor(port: number) {
     this.wss = new WebSocketServer({ port });
+    this.updatePerformanceSettings();
     this.setupHandlers();
     this.startHeartbeat();
+
+    this.wss.on('error', (error: Error) => {
+      if ((error as any).code === 'EADDRINUSE') {
+        logger.error(`Port ${port} is already in use. Please close the process using this port or change the WS_PORT environment variable.`);
+        logger.error('To find the process using the port, run: lsof -i :' + port + ' or ss -tlnp | grep :' + port);
+      } else {
+        logger.error({ error }, 'WebSocket server error');
+      }
+    });
+  }
+
+  private updatePerformanceSettings(): void {
+    const perfConfig = performanceManager.getConfig();
+    this.bufferMaxSize = perfConfig.wsBufferMaxSize;
   }
 
   private setupHandlers(): void {
@@ -53,14 +71,19 @@ export class WSServer {
       });
 
       ws.on('close', () => {
-        logger.info('WebSocket client disconnected');
+        const clientId = `client-${Date.now()}`;
+        logger.logWsClientDisconnect(clientId, 'normal_close');
+        transportMonitor.recordWsClientDisconnect(clientId, 'normal_close');
       });
 
       ws.on('error', (error) => {
-        logger.error({ error }, 'WebSocket error');
+        logger.logWsError('connection_error', error);
       });
 
-      logger.info('WebSocket client connected');
+      const clientId = `client-${Date.now()}`;
+      const ip = (ws as any)._socket?.remoteAddress || 'unknown';
+      logger.logWsClientConnect(clientId, ip);
+      transportMonitor.recordWsClientConnect(clientId, ip);
     });
   }
 
@@ -104,7 +127,10 @@ export class WSServer {
   }
 
   broadcastMessage(msg: MessageData): void {
+    this.updatePerformanceSettings();
+    
     const topic = `realtime/${msg.name}`;
+    const sendStartTime = Date.now();
     
     if (this.messageBuffer.size >= this.bufferMaxSize) {
       const firstKey = this.messageBuffer.keys().next().value;
@@ -114,7 +140,16 @@ export class WSServer {
     }
     this.messageBuffer.set(topic, msg);
 
-    const payload = JSON.stringify({ topic, data: msg });
+    this.messageSequence++;
+    const payload = JSON.stringify({ 
+      topic, 
+      data: msg,
+      sequence: this.messageSequence,
+    });
+
+    let clientCount = 0;
+    let successCount = 0;
+    let errorCount = 0;
 
     this.wss.clients.forEach((ws: WebSocket) => {
       const client = ws as WsClient;
@@ -125,10 +160,28 @@ export class WSServer {
           client.subscribedTopics.has('realtime/overview');
         
         if (shouldSend) {
-          ws.send(payload);
+          clientCount++;
+          try {
+            ws.send(payload);
+            successCount++;
+          } catch (error) {
+            errorCount++;
+            logger.logWsError('send', error as Error, {
+              errorCode: 'WS_SEND_FAILED',
+              topic,
+            });
+          }
         }
       }
     });
+
+    const duration = Date.now() - sendStartTime;
+    logger.logWsSend(topic, payload.length, clientCount, duration);
+    transportMonitor.recordWsSend(topic, payload.length, clientCount, duration, errorCount === 0);
+  }
+
+  getConnectedClientsCount(): number {
+    return this.wss.clients.size;
   }
 
   close(): void {

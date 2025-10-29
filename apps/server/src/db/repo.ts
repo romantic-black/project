@@ -4,9 +4,11 @@ import { mkdirSync, existsSync, renameSync, unlinkSync } from 'fs';
 import type { DbSignalAgg } from '@can-telemetry/common';
 import config, { PROJECT_ROOT } from '../config.js';
 import * as schema from './schema.js';
-import pino from 'pino';
+import { createLogger } from '../utils/logger.js';
+import { transportMonitor } from './transport-monitor.js';
+import { performanceManager } from '../performance/manager.js';
 
-const logger = pino({ level: config.LOG_LEVEL });
+const logger = createLogger('db-repo');
 
 export class DbRepo {
   private db: Database.Database;
@@ -20,6 +22,7 @@ export class DbRepo {
   private flushInterval?: NodeJS.Timeout;
   private cleanupInterval?: NodeJS.Timeout;
   private isCorrupted = false;
+  private enable1sAggregation = true;
   
   // Cached prepared statements
   private insert1sStmt?: Database.Statement;
@@ -51,12 +54,18 @@ export class DbRepo {
     // Initialize prepared statements
     this.initializeStatements();
     
-    // Start periodic flush (every 5 seconds)
+    // Update performance settings
+    this.updatePerformanceSettings();
+    
+    // Start periodic flush (interval based on performance mode)
+    const flushIntervalMs = performanceManager.getConfig().dbFlushInterval;
     this.flushInterval = setInterval(() => {
       if (this.buffer.length > 0) {
         this.flush();
       }
-    }, 5000);
+      // Update settings periodically in case mode changed
+      this.updatePerformanceSettings();
+    }, flushIntervalMs);
     
     // Start periodic cleanup (every hour)
     this.cleanupInterval = setInterval(() => {
@@ -76,7 +85,7 @@ export class DbRepo {
     try {
       const result = this.db.prepare('PRAGMA integrity_check').get() as { integrity_check: string };
       if (result.integrity_check !== 'ok') {
-        logger.warn({ integrity: result.integrity_check }, 'Database integrity check failed');
+        logger.warn('Database integrity check failed', { integrity: result.integrity_check });
         this.recoverDatabase();
       }
     } catch (error: any) {
@@ -107,9 +116,9 @@ export class DbRepo {
         const backupPath = `${this.dbPath}.corrupted.${Date.now()}`;
         try {
           renameSync(this.dbPath, backupPath);
-          logger.warn({ backupPath }, 'Corrupted database backed up');
+          logger.warn('Corrupted database backed up', { backupPath });
         } catch (error) {
-          logger.error({ error }, 'Failed to backup corrupted database');
+          logger.error('Failed to backup corrupted database', { error });
         }
       }
 
@@ -131,7 +140,7 @@ export class DbRepo {
       this.isCorrupted = false;
       logger.info('Database recovery completed successfully');
     } catch (error) {
-      logger.error({ error }, 'Database recovery failed');
+      logger.error('Database recovery failed', { error });
       this.isCorrupted = true;
       throw error;
     }
@@ -145,7 +154,7 @@ export class DbRepo {
         this.recoverDatabase();
         logger.info('Database recovered, operation can continue');
       } catch (recoveryError) {
-        logger.error({ error: recoveryError }, 'Database recovery failed');
+        logger.error('Database recovery failed', { error: recoveryError });
         throw recoveryError;
       }
     } else {
@@ -264,6 +273,14 @@ export class DbRepo {
     }
   }
 
+  private updatePerformanceSettings(): void {
+    const perfConfig = performanceManager.getConfig();
+    this.enable1sAggregation = perfConfig.enable1sAggregation;
+    
+    // Update flush interval would require recreating interval, which is handled
+    // by checking in the interval callback
+  }
+
   private flush(): void {
     if (this.buffer.length === 0) return;
     if (this.isCorrupted) {
@@ -271,6 +288,11 @@ export class DbRepo {
       this.buffer = [];
       return;
     }
+
+    const flushStartTime = Date.now();
+    const bufferSize = this.buffer.length;
+    let successCount = 0;
+    let errorCount = 0;
 
     const now = Date.now();
     const oneSecondAgo = now - 1000;
@@ -313,35 +335,38 @@ export class DbRepo {
 
     try {
       const transaction = this.db.transaction(() => {
-        // Process 1s aggregates
-        for (const [bucketKey, windowValues] of oneSecondBuckets.entries()) {
-          if (windowValues.length === 0) continue;
-          
-          const [timestampStr, signalName] = bucketKey.split('_');
-          const timestamp = parseInt(timestampStr, 10);
-          
-          // Sort by timestamp to get correct first/last
-          windowValues.sort((a, b) => a.timestamp - b.timestamp);
-          
-          const last1s = windowValues[windowValues.length - 1];
-          const first1s = windowValues[0];
-          const sum1s = windowValues.reduce((acc, v) => acc + v.value, 0);
-          const avg1s = sum1s / windowValues.length;
-          const max1s = Math.max(...windowValues.map((v) => v.value));
-          const min1s = Math.min(...windowValues.map((v) => v.value));
+        // Process 1s aggregates (only if enabled)
+        if (this.enable1sAggregation) {
+          for (const [bucketKey, windowValues] of oneSecondBuckets.entries()) {
+            if (windowValues.length === 0) continue;
+            
+            const [timestampStr, signalName] = bucketKey.split('_');
+            const timestamp = parseInt(timestampStr, 10);
+            
+            // Sort by timestamp to get correct first/last
+            windowValues.sort((a, b) => a.timestamp - b.timestamp);
+            
+            const last1s = windowValues[windowValues.length - 1];
+            const first1s = windowValues[0];
+            const sum1s = windowValues.reduce((acc, v) => acc + v.value, 0);
+            const avg1s = sum1s / windowValues.length;
+            const max1s = Math.max(...windowValues.map((v) => v.value));
+            const min1s = Math.min(...windowValues.map((v) => v.value));
 
-          this.insert1sStmt!.run(
-            timestamp,
-            signalName,
-            last1s.value,
-            first1s.value,
-            avg1s,
-            max1s,
-            min1s
-          );
+            this.insert1sStmt!.run(
+              timestamp,
+              signalName,
+              last1s.value,
+              first1s.value,
+              avg1s,
+              max1s,
+              min1s
+            );
+            successCount += windowValues.length;
+          }
         }
 
-        // Process 10s aggregates
+        // Process 10s aggregates (always enabled)
         for (const [bucketKey, windowValues] of tenSecondBuckets.entries()) {
           if (windowValues.length === 0) continue;
           
@@ -367,42 +392,66 @@ export class DbRepo {
             max10s,
             min10s
           );
+          successCount += windowValues.length;
         }
       });
 
       transaction();
+      const duration = Date.now() - flushStartTime;
+      
+      // Record successful operation
+      transportMonitor.recordDbFlush(bufferSize, successCount, errorCount, duration);
+      if (this.enable1sAggregation) {
+        transportMonitor.recordDbOperation('insert', 'signals_agg_1s', true, oneSecondBuckets.size, duration);
+      }
+      transportMonitor.recordDbOperation('insert', 'signals_agg_10s', true, tenSecondBuckets.size, duration);
+      
+      logger.logDbFlush(bufferSize, successCount, errorCount, duration);
       this.buffer = [];
     } catch (error: any) {
+      errorCount = bufferSize;
+      const duration = Date.now() - flushStartTime;
+      
+      // Record failed operation
+      transportMonitor.recordDbFlush(bufferSize, 0, errorCount, duration);
+      if (this.enable1sAggregation) {
+        transportMonitor.recordDbOperation('insert', 'signals_agg_1s', false, 0, duration, error);
+      }
+      transportMonitor.recordDbOperation('insert', 'signals_agg_10s', false, 0, duration, error);
+      
       this.handleCorruption(error);
       // Retry flush after recovery (but only once to avoid infinite loop)
       if (!this.isCorrupted && this.buffer.length > 0) {
         try {
+          const retryStartTime = Date.now();
           const transaction = this.db.transaction(() => {
-            // Process 1s aggregates
-            for (const [bucketKey, windowValues] of oneSecondBuckets.entries()) {
-              if (windowValues.length === 0) continue;
-              
-              const [timestampStr, signalName] = bucketKey.split('_');
-              const timestamp = parseInt(timestampStr, 10);
-              
-              windowValues.sort((a, b) => a.timestamp - b.timestamp);
-              
-              const last1s = windowValues[windowValues.length - 1];
-              const first1s = windowValues[0];
-              const sum1s = windowValues.reduce((acc, v) => acc + v.value, 0);
-              const avg1s = sum1s / windowValues.length;
-              const max1s = Math.max(...windowValues.map((v) => v.value));
-              const min1s = Math.min(...windowValues.map((v) => v.value));
+            // Process 1s aggregates (only if enabled)
+            if (this.enable1sAggregation) {
+              for (const [bucketKey, windowValues] of oneSecondBuckets.entries()) {
+                if (windowValues.length === 0) continue;
+                
+                const [timestampStr, signalName] = bucketKey.split('_');
+                const timestamp = parseInt(timestampStr, 10);
+                
+                windowValues.sort((a, b) => a.timestamp - b.timestamp);
+                
+                const last1s = windowValues[windowValues.length - 1];
+                const first1s = windowValues[0];
+                const sum1s = windowValues.reduce((acc, v) => acc + v.value, 0);
+                const avg1s = sum1s / windowValues.length;
+                const max1s = Math.max(...windowValues.map((v) => v.value));
+                const min1s = Math.min(...windowValues.map((v) => v.value));
 
-              this.insert1sStmt!.run(
-                timestamp,
-                signalName,
-                last1s.value,
-                first1s.value,
-                avg1s,
-                max1s,
-                min1s
-              );
+                this.insert1sStmt!.run(
+                  timestamp,
+                  signalName,
+                  last1s.value,
+                  first1s.value,
+                  avg1s,
+                  max1s,
+                  min1s
+                );
+              }
             }
 
             // Process 10s aggregates
@@ -434,9 +483,13 @@ export class DbRepo {
           });
 
           transaction();
+          const retryDuration = Date.now() - retryStartTime;
+          transportMonitor.recordDbFlush(bufferSize, bufferSize, 0, retryDuration);
           this.buffer = [];
         } catch (retryError) {
-          logger.error({ error: retryError }, 'Failed to flush after recovery, dropping buffer');
+          logger.logDbError('flush_retry', 'signals_agg', retryError as Error, {
+            errorCode: 'DB_FLUSH_RETRY_FAILED',
+          });
           this.buffer = [];
         }
       } else {
@@ -552,13 +605,13 @@ export class DbRepo {
       try {
         this.flush();
       } catch (error) {
-        logger.error({ error }, 'Error during final flush');
+        logger.error('Error during final flush', { error });
       }
     }
     try {
       this.db.close();
     } catch (error) {
-      logger.error({ error }, 'Error closing database');
+      logger.error('Error closing database', { error });
     }
   }
 }

@@ -1,10 +1,14 @@
 import express from 'express';
 import { HistoryQuerySchema, SnapshotQuerySchema } from '@can-telemetry/common';
 import { dbRepo } from '../db/repo.js';
-import pino from 'pino';
 import config from '../config.js';
+import { createLogger } from '../utils/logger.js';
+import { canDiagnostics } from '../dbc/diagnostics.js';
+import { transportMonitor } from '../db/transport-monitor.js';
+import { healthMonitor } from '../monitoring/health.js';
+import { performanceManager } from '../performance/manager.js';
 
-const logger = pino({ level: config.LOG_LEVEL });
+const logger = createLogger('rest-api');
 
 export function setupRestApi(app: express.Application): void {
   app.use(express.json());
@@ -40,6 +44,7 @@ export function setupRestApi(app: express.Application): void {
 
   app.get('/api/status', (_req, res) => {
     const canSource = (globalThis as any).canSource;
+    const wss = (globalThis as any).wss;
     res.json({
       dataMode: config.DATA_MODE,
       canIface: config.CAN_IFACE,
@@ -48,7 +53,75 @@ export function setupRestApi(app: express.Application): void {
       stats: canSource?.stats ? canSource.stats() : null,
       wsPort: config.WS_PORT,
       httpPort: config.HTTP_PORT,
+      wsClients: wss?.getConnectedClientsCount ? wss.getConnectedClientsCount() : 0,
     });
+  });
+
+  // Diagnostic endpoints
+  app.get('/api/diagnostics/can-errors', (_req, res) => {
+    try {
+      const stats = canDiagnostics.getErrorStats();
+      const unknownIds = canDiagnostics.getUnknownIds();
+      res.json({
+        errors: stats,
+        unknownIds,
+      });
+    } catch (error) {
+      logger.error('Error fetching CAN diagnostics', { error });
+      res.status(500).json({ error: 'Failed to fetch diagnostics' });
+    }
+  });
+
+  app.get('/api/diagnostics/data-flow', (_req, res) => {
+    try {
+      const status = transportMonitor.getDataFlowStatus();
+      res.json(status);
+    } catch (error) {
+      logger.error('Error fetching data flow status', { error });
+      res.status(500).json({ error: 'Failed to fetch data flow status' });
+    }
+  });
+
+  app.get('/api/health/detailed', (_req, res) => {
+    try {
+      const canSource = (globalThis as any).canSource;
+      const health = healthMonitor.getHealthStatus(canSource);
+      const wss = (globalThis as any).wss;
+      if (wss && health.components.websocket.stats) {
+        health.components.websocket.stats.connectedClients = wss.getConnectedClientsCount ? wss.getConnectedClientsCount() : 0;
+      }
+      res.json(health);
+    } catch (error) {
+      logger.error('Error fetching health status', { error });
+      res.status(500).json({ error: 'Failed to fetch health status' });
+    }
+  });
+
+  app.get('/api/performance/metrics', (_req, res) => {
+    try {
+      const config = performanceManager.getConfig();
+      const metrics = performanceManager.getRecentMetrics(100);
+      const avgMetrics = performanceManager.getAverageMetrics(60000);
+      res.json({
+        mode: performanceManager.getMode(),
+        config,
+        recentMetrics: metrics,
+        averageMetrics: avgMetrics,
+      });
+    } catch (error) {
+      logger.error('Error fetching performance metrics', { error });
+      res.status(500).json({ error: 'Failed to fetch performance metrics' });
+    }
+  });
+
+  app.get('/api/monitoring/signals', (_req, res) => {
+    try {
+      const signals = healthMonitor.getAllSignalsStatus();
+      res.json({ signals });
+    } catch (error) {
+      logger.error('Error fetching signal status', { error });
+      res.status(500).json({ error: 'Failed to fetch signal status' });
+    }
   });
 
   app.post('/api/can/send', async (req, res) => {
