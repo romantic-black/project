@@ -6,7 +6,7 @@ import * as echarts from 'echarts';
 import { useSignalHistory } from '../hooks/useSignalHistory';
 
 export default function ISG() {
-  const { getSignal } = useTelemetryStore();
+  const { getSignal, messages } = useTelemetryStore();
 
   const voltage = getSignal('ISG_DCvoltage');
   const current = getSignal('ISG_DCcurrent');
@@ -45,6 +45,9 @@ export default function ISG() {
   const mode = getSignal('ISG_ActMode');
   const enabled = getSignal('ISG_ActEnSts');
 
+  const isgInfo1Timestamp = messages.get('ISG_Info1')?.timestamp;
+  const isgInfo2Timestamp = messages.get('ISG_Info2')?.timestamp;
+
   const chartOption: echarts.EChartsOption = useMemo(
     () => ({
       tooltip: {
@@ -75,6 +78,7 @@ export default function ISG() {
           smooth: true,
           showSymbol: false,
           data: speedHistory.map((item) => [item.timestamp, item.value]),
+          data: isgInfo1Timestamp ? [[isgInfo1Timestamp, speed ?? 0]] : [],
           yAxisIndex: 0,
         },
         {
@@ -84,11 +88,13 @@ export default function ISG() {
           showSymbol: false,
           areaStyle: { opacity: 0.15 },
           data: torqueHistory.map((item) => [item.timestamp, item.value]),
+          data: isgInfo1Timestamp ? [[isgInfo1Timestamp, torque ?? 0]] : [],
           yAxisIndex: 1,
         },
       ],
     }),
     [speedHistory, torqueHistory]
+    [speed, torque, isgInfo1Timestamp]
   );
 
   const powerChartOption: echarts.EChartsOption = useMemo(
@@ -121,6 +127,7 @@ export default function ISG() {
           smooth: true,
           showSymbol: false,
           data: voltageHistory.map((item) => [item.timestamp, item.value]),
+          data: isgInfo2Timestamp ? [[isgInfo2Timestamp, voltage ?? 0]] : [],
           yAxisIndex: 0,
         },
         {
@@ -129,6 +136,7 @@ export default function ISG() {
           smooth: true,
           showSymbol: false,
           data: currentHistory.map((item) => [item.timestamp, item.value]),
+          data: isgInfo2Timestamp ? [[isgInfo2Timestamp, current ?? 0]] : [],
           yAxisIndex: 1,
         },
         {
@@ -138,11 +146,13 @@ export default function ISG() {
           showSymbol: false,
           areaStyle: { opacity: 0.15 },
           data: powerHistory.map((item) => [item.timestamp, item.value]),
+          data: isgInfo2Timestamp ? [[isgInfo2Timestamp, power ?? 0]] : [],
           yAxisIndex: 1,
         },
       ],
     }),
     [currentHistory, powerHistory, voltageHistory]
+    [voltage, current, power, isgInfo2Timestamp]
   );
 
   return (

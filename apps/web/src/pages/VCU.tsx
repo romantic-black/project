@@ -6,7 +6,7 @@ import * as echarts from 'echarts';
 import { useSignalHistory } from '../hooks/useSignalHistory';
 
 export default function VCU() {
-  const { getSignal } = useTelemetryStore();
+  const { getSignal, messages } = useTelemetryStore();
 
   const angSpeed = getSignal('VCU_VehAngSpeed');
   const brkPres = getSignal('VCU_BrkPres');
@@ -16,6 +16,8 @@ export default function VCU() {
   const modeSwitchFlag = getSignal('VCU_ModeSwitchingFlag');
   const modeSwitchAvail = getSignal('VCU_ModeSwitchAvailFlag');
   const odo = getSignal('VCU_OdoMeter');
+
+  const vcuInfo1Timestamp = messages.get('VCU_Info1')?.timestamp;
 
   const chartOption: echarts.EChartsOption = useMemo(
     () => ({
@@ -47,6 +49,7 @@ export default function VCU() {
           smooth: true,
           showSymbol: false,
           data: angSpeedHistory.map((item) => [item.timestamp, item.value]),
+          data: vcuInfo1Timestamp ? [[vcuInfo1Timestamp, angSpeed ?? 0]] : [],
           yAxisIndex: 0,
         },
         {
@@ -56,11 +59,13 @@ export default function VCU() {
           showSymbol: false,
           areaStyle: { opacity: 0.15 },
           data: brkPresHistory.map((item) => [item.timestamp, item.value]),
+          data: vcuInfo1Timestamp ? [[vcuInfo1Timestamp, brkPres ?? 0]] : [],
           yAxisIndex: 1,
         },
       ],
     }),
     [angSpeedHistory, brkPresHistory]
+    [angSpeed, brkPres, vcuInfo1Timestamp]
   );
 
   return (

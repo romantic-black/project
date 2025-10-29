@@ -7,7 +7,7 @@ import * as echarts from 'echarts';
 import { useSignalHistory } from '../hooks/useSignalHistory';
 
 export default function Engine() {
-  const { getSignal } = useTelemetryStore();
+  const { getSignal, messages } = useTelemetryStore();
 
   const torque = getSignal('EEC1_ActEngPcntTrq');
   const speed = getSignal('EEC1_EngSpeed');
@@ -21,6 +21,9 @@ export default function Engine() {
   const starterMode = getSignal('EEC1_EngStarterMode');
   const demandTrq = getSignal('EEC1_DemandPcntTrq');
   const driverTrq = getSignal('EEC1_DriverDemandPcntTrq');
+
+  const eec1Timestamp = messages.get('J1939_EEC1')?.timestamp;
+  const eec2Timestamp = messages.get('J1939_EEC2')?.timestamp;
 
   const chartOption: echarts.EChartsOption = useMemo(
     () => ({
@@ -53,6 +56,7 @@ export default function Engine() {
           showSymbol: false,
           areaStyle: { opacity: 0.15 },
           data: torqueHistory.map((item) => [item.timestamp, item.value]),
+          data: eec1Timestamp ? [[eec1Timestamp, torque ?? 0]] : [],
           yAxisIndex: 0,
         },
         {
@@ -61,6 +65,7 @@ export default function Engine() {
           smooth: true,
           showSymbol: false,
           data: speedHistory.map((item) => [item.timestamp, item.value]),
+          data: eec1Timestamp ? [[eec1Timestamp, speed ?? 0]] : [],
           yAxisIndex: 1,
         },
         {
@@ -69,6 +74,7 @@ export default function Engine() {
           smooth: true,
           showSymbol: false,
           data: loadHistory.map((item) => [item.timestamp, item.value]),
+          data: eec2Timestamp ? [[eec2Timestamp, load ?? 0]] : [],
           yAxisIndex: 0,
         },
         {
@@ -77,11 +83,13 @@ export default function Engine() {
           smooth: true,
           showSymbol: false,
           data: throttleHistory.map((item) => [item.timestamp, item.value]),
+          data: eec2Timestamp ? [[eec2Timestamp, throttle ?? 0]] : [],
           yAxisIndex: 0,
         },
       ],
     }),
     [loadHistory, speedHistory, throttleHistory, torqueHistory]
+    [torque, speed, load, throttle, eec1Timestamp, eec2Timestamp]
   );
 
   return (
