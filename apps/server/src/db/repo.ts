@@ -69,39 +69,12 @@ export class DbRepo {
         msg_id INTEGER NOT NULL,
         data TEXT NOT NULL
       );
+    `);
 
-      CREATE TABLE IF NOT EXISTS signals_agg_1s (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp INTEGER NOT NULL,
-        signal_name TEXT NOT NULL,
-        last_value REAL NOT NULL,
-        first_value REAL NOT NULL,
-        avg_value REAL NOT NULL,
-        max_value REAL NOT NULL,
-        min_value REAL NOT NULL,
-        UNIQUE(timestamp, signal_name)
-      );
+    this.ensureAggregateTable('signals_agg_1s');
+    this.ensureAggregateTable('signals_agg_10s');
 
-      CREATE INDEX IF NOT EXISTS idx_signals_agg_1s_timestamp ON signals_agg_1s(timestamp);
-      CREATE INDEX IF NOT EXISTS idx_signals_agg_1s_signal_name ON signals_agg_1s(signal_name);
-      CREATE INDEX IF NOT EXISTS idx_signals_agg_1s_composite ON signals_agg_1s(timestamp, signal_name);
-
-      CREATE TABLE IF NOT EXISTS signals_agg_10s (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        timestamp INTEGER NOT NULL,
-        signal_name TEXT NOT NULL,
-        last_value REAL NOT NULL,
-        first_value REAL NOT NULL,
-        avg_value REAL NOT NULL,
-        max_value REAL NOT NULL,
-        min_value REAL NOT NULL,
-        UNIQUE(timestamp, signal_name)
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_signals_agg_10s_timestamp ON signals_agg_10s(timestamp);
-      CREATE INDEX IF NOT EXISTS idx_signals_agg_10s_signal_name ON signals_agg_10s(signal_name);
-      CREATE INDEX IF NOT EXISTS idx_signals_agg_10s_composite ON signals_agg_10s(timestamp, signal_name);
-
+    this.db.exec(`
       CREATE TABLE IF NOT EXISTS events_alarm (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         timestamp INTEGER NOT NULL,
@@ -115,17 +88,73 @@ export class DbRepo {
     `);
   }
 
+  private ensureAggregateTable(table: 'signals_agg_1s' | 'signals_agg_10s'): void {
+    const createTableSql = `
+      CREATE TABLE IF NOT EXISTS ${table} (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp INTEGER NOT NULL,
+        signal_name TEXT NOT NULL,
+        last_value REAL NOT NULL,
+        first_value REAL NOT NULL,
+        avg_value REAL NOT NULL,
+        max_value REAL NOT NULL,
+        min_value REAL NOT NULL
+      );
+    `;
+
+    this.db.exec(createTableSql);
+
+    const existingIndexes = this.db.prepare(`PRAGMA index_list(${table})`).all() as Array<{
+      name: string;
+      unique: number;
+      origin: string;
+    }>;
+
+    const hasUniqueConstraint = existingIndexes.some((idx) => idx.origin === 'u');
+
+    if (hasUniqueConstraint) {
+      const rebuild = this.db.transaction(() => {
+        this.db.exec(`
+          CREATE TABLE ${table}_tmp (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp INTEGER NOT NULL,
+            signal_name TEXT NOT NULL,
+            last_value REAL NOT NULL,
+            first_value REAL NOT NULL,
+            avg_value REAL NOT NULL,
+            max_value REAL NOT NULL,
+            min_value REAL NOT NULL
+          );
+
+          INSERT INTO ${table}_tmp (timestamp, signal_name, last_value, first_value, avg_value, max_value, min_value)
+          SELECT timestamp, signal_name, last_value, first_value, avg_value, max_value, min_value FROM ${table};
+
+          DROP TABLE ${table};
+          ALTER TABLE ${table}_tmp RENAME TO ${table};
+        `);
+      });
+
+      rebuild();
+    }
+
+    const prefix = table === 'signals_agg_1s' ? 'idx_signals_agg_1s' : 'idx_signals_agg_10s';
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS ${prefix}_timestamp ON ${table}(timestamp);
+      CREATE INDEX IF NOT EXISTS ${prefix}_signal_name ON ${table}(signal_name);
+      CREATE INDEX IF NOT EXISTS ${prefix}_composite ON ${table}(timestamp, signal_name);
+    `);
+  }
+
   private initializeStatements(): void {
-    // Use INSERT OR REPLACE to handle duplicate (timestamp, signal_name) pairs
     this.insert1sStmt = this.db.prepare(`
-      INSERT OR REPLACE INTO signals_agg_1s 
-      (timestamp, signal_name, last_value, first_value, avg_value, max_value, min_value) 
+      INSERT INTO signals_agg_1s
+      (timestamp, signal_name, last_value, first_value, avg_value, max_value, min_value)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
-    
+
     this.insert10sStmt = this.db.prepare(`
-      INSERT OR REPLACE INTO signals_agg_10s 
-      (timestamp, signal_name, last_value, first_value, avg_value, max_value, min_value) 
+      INSERT INTO signals_agg_10s
+      (timestamp, signal_name, last_value, first_value, avg_value, max_value, min_value)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     

@@ -53,9 +53,17 @@ export class MockSource implements ICanSource {
             const length = signal.length ?? 8;
             const bigEndian = isBigEndian(signal.endianness);
 
+            if (length > 53) {
+              console.warn(
+                `Skipping signal ${signal.name} in message ${msg.name}: length ${length} exceeds 53-bit limit`
+              );
+              continue;
+            }
+
             // Ensure raw value fits in the bit range
-            const maxRawValue = (1 << length) - 1;
-            const minRawValue = length > 31 ? -2147483648 : (length === 1 ? 0 : -(1 << (length - 1)));
+            const isSigned = (signal.min ?? 0) < 0;
+            const maxRawValue = isSigned ? Math.pow(2, length - 1) - 1 : Math.pow(2, length) - 1;
+            const minRawValue = isSigned ? -Math.pow(2, length - 1) : 0;
             const clampedRawValue = Math.max(minRawValue, Math.min(maxRawValue, rawValue));
 
             encodeBits(data, startBit, length, clampedRawValue, bigEndian);

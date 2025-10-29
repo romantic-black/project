@@ -2,8 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useTelemetryStore } from '../stores/telemetry';
 import type { MessageData } from '@can-telemetry/common';
 
-// Use direct WebSocket connection to avoid proxy issues
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080';
+const WS_URL = import.meta.env.VITE_WS_URL || (import.meta.env.DEV ? '/ws' : 'ws://localhost:8080');
 const MAX_QUEUE_SIZE = 1000;
 const INITIAL_RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_DELAY = 30000;
