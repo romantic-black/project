@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "tsc -p tsconfig.test.json && node --test dist-test/telemetry.test.js"
   },
   "dependencies": {
     "@can-telemetry/common": "workspace:*",

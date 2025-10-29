@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useTelemetryStore } from '../stores/telemetry';
 import { SignalCard } from '../components/SignalCard';
 import { StatusBadge } from '../components/StatusBadge';
@@ -6,18 +6,16 @@ import { HeartbeatIndicator } from '../components/HeartbeatIndicator';
 import { ChartContainer } from '../components/ChartContainer';
 import { getValTableText } from '../utils/dbc';
 import * as echarts from 'echarts';
+import { useSignalHistory } from '../hooks/useSignalHistory';
 
 export default function Dashboard() {
-  const { messages, getSignal } = useTelemetryStore();
+  const { getSignal } = useTelemetryStore();
 
   const speed = getSignal('VCU_VehSpeed');
-  const speedHistory = useMemo(() => {
-    const msg = messages.get('VCU_Info1');
-    if (!msg) return [];
-    return [{ time: new Date(msg.timestamp), value: speed || 0 }];
-  }, [speed, messages]);
-
   const rpm = getSignal('EEC1_EngSpeed');
+  const speedHistory = useSignalHistory('VCU_VehSpeed');
+  const rpmHistory = useSignalHistory('EEC1_EngSpeed');
+
   const soc = getSignal('VCU_BatSOC');
   const fuel = getSignal('VCU_FeulSts');
   const gear = getSignal('VCU_CurrentGear');
@@ -80,6 +78,45 @@ export default function Dashboard() {
       ],
     }),
     [speed]
+  );
+
+  const drivetrainTrendOption: echarts.EChartsOption = useMemo(
+    () => ({
+      tooltip: { trigger: 'axis' },
+      legend: { data: ['车速', '转速'] },
+      xAxis: { type: 'time' },
+      yAxis: [
+        {
+          type: 'value',
+          name: '车速 (km/h)',
+          position: 'left',
+        },
+        {
+          type: 'value',
+          name: '转速 (rpm)',
+          position: 'right',
+        },
+      ],
+      series: [
+        {
+          name: '车速',
+          type: 'line',
+          smooth: true,
+          showSymbol: false,
+          areaStyle: { opacity: 0.2 },
+          data: speedHistory.map((item) => [item.timestamp, item.value]),
+        },
+        {
+          name: '转速',
+          type: 'line',
+          smooth: true,
+          showSymbol: false,
+          yAxisIndex: 1,
+          data: rpmHistory.map((item) => [item.timestamp, item.value]),
+        },
+      ],
+    }),
+    [rpmHistory, speedHistory]
   );
 
   const rpmGaugeOption: echarts.EChartsOption = useMemo(
@@ -216,6 +253,11 @@ export default function Dashboard() {
           <h3 className="text-lg font-semibold mb-4">转速</h3>
           <ChartContainer option={rpmGaugeOption} height="300px" />
         </div>
+      </div>
+
+      <div className="bg-white p-4 rounded-lg shadow mb-6">
+        <h3 className="text-lg font-semibold mb-4">动力总成趋势</h3>
+        <ChartContainer option={drivetrainTrendOption} height="320px" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
