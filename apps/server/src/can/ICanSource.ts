@@ -1,4 +1,5 @@
 import type { CanFrame, SourceStats } from '@can-telemetry/common';
+export type { SourceStats } from '@can-telemetry/common';
 
 export interface ICanSource {
   start(): Promise<void>;

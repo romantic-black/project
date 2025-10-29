@@ -21,8 +21,6 @@ export default function Dashboard() {
   const gear = getSignal('VCU_CurrentGear');
   const mode = getSignal('VCU_Mode');
   const errLevel = getSignal('VCU_ErrLevel');
-  const connected = useTelemetryStore((s) => s.connected);
-
   const speedGaugeOption: echarts.EChartsOption = useMemo(
     () => ({
       series: [

@@ -4,6 +4,7 @@ import { SignalCard } from '../components/SignalCard';
 import { ChartContainer } from '../components/ChartContainer';
 import * as echarts from 'echarts';
 import { useSignalHistory } from '../hooks/useSignalHistory';
+import { combineHistoryWithLatest } from '../utils/chart';
 
 export default function VCU() {
   const { getSignal, messages } = useTelemetryStore();
@@ -48,8 +49,7 @@ export default function VCU() {
           type: 'line',
           smooth: true,
           showSymbol: false,
-          data: angSpeedHistory.map((item) => [item.timestamp, item.value]),
-          data: vcuInfo1Timestamp ? [[vcuInfo1Timestamp, angSpeed ?? 0]] : [],
+          data: combineHistoryWithLatest(angSpeedHistory, vcuInfo1Timestamp, angSpeed ?? undefined),
           yAxisIndex: 0,
         },
         {
@@ -58,14 +58,12 @@ export default function VCU() {
           smooth: true,
           showSymbol: false,
           areaStyle: { opacity: 0.15 },
-          data: brkPresHistory.map((item) => [item.timestamp, item.value]),
-          data: vcuInfo1Timestamp ? [[vcuInfo1Timestamp, brkPres ?? 0]] : [],
+          data: combineHistoryWithLatest(brkPresHistory, vcuInfo1Timestamp, brkPres ?? undefined),
           yAxisIndex: 1,
         },
       ],
     }),
-    [angSpeedHistory, brkPresHistory]
-    [angSpeed, brkPres, vcuInfo1Timestamp]
+    [angSpeed, angSpeedHistory, brkPres, brkPresHistory, vcuInfo1Timestamp]
   );
 
   return (

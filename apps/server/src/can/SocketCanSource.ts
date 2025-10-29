@@ -13,7 +13,7 @@ try {
 export class SocketCanSource implements ICanSource {
   private channel?: any;
   private frameCallback?: (frame: CanFrame) => void;
-  private stats: SourceStats = { frames: 0, errors: 0 };
+  private statsState: SourceStats = { frames: 0, errors: 0 };
   private isRunning = false;
 
   constructor() {
@@ -41,15 +41,15 @@ export class SocketCanSource implements ICanSource {
             extended: msg.ext,
           };
           this.frameCallback(frame);
-          this.stats.frames++;
+          this.statsState.frames++;
         }
       });
 
       this.channel.start();
       this.isRunning = true;
-      this.stats = { frames: 0, errors: 0 };
+      this.statsState = { frames: 0, errors: 0 };
     } catch (error) {
-      this.stats.errors++;
+      this.statsState.errors++;
       throw error;
     }
   }
@@ -61,7 +61,7 @@ export class SocketCanSource implements ICanSource {
       try {
         this.channel.stop();
       } catch (error) {
-        this.stats.errors++;
+        this.statsState.errors++;
       }
       this.channel = undefined;
     }
@@ -84,13 +84,13 @@ export class SocketCanSource implements ICanSource {
       };
       this.channel.send(msg);
     } catch (error) {
-      this.stats.errors++;
+      this.statsState.errors++;
       throw error;
     }
   }
 
   stats(): SourceStats {
-    return { ...this.stats };
+    return { ...this.statsState };
   }
 }
 

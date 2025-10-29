@@ -3,13 +3,12 @@ import { useTelemetryStore } from '../stores/telemetry';
 import type { MessageData } from '@can-telemetry/common';
 
 const WS_URL = import.meta.env.VITE_WS_URL || (import.meta.env.DEV ? '/ws' : 'ws://localhost:8080');
-const MAX_QUEUE_SIZE = 1000;
 const INITIAL_RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_DELAY = 30000;
 
 export function useWebSocket(topics: string[] = ['realtime/*']) {
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const isConnectingRef = useRef(false);
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY);
   const errorShownRef = useRef(false);
@@ -65,10 +64,9 @@ export function useWebSocket(topics: string[] = ['realtime/*']) {
             }
             
             // Handle data messages
-            const { topic, data } = parsed;
+            const data = parsed.data;
             if (data && typeof data === 'object') {
-              const msg = data as MessageData;
-              setMessage(msg);
+              setMessage(data as MessageData);
             }
           } catch (error) {
             console.warn('Failed to parse WebSocket message', error);
@@ -95,7 +93,7 @@ export function useWebSocket(topics: string[] = ['realtime/*']) {
           }
         };
 
-        ws.onerror = (error) => {
+        ws.onerror = () => {
           isConnectingRef.current = false;
           if (!mounted) return;
           
