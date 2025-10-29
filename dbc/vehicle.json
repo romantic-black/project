@@ -16,7 +16,8 @@
           "min": 0,
           "max": 200,
           "unit": "km/h",
-          "endianness": "big"
+          "endianness": "big",
+          "signed": false
         },
         {
           "name": "VCU_BatSOC",
@@ -27,7 +28,8 @@
           "min": 0,
           "max": 100,
           "unit": "%",
-          "endianness": "big"
+          "endianness": "big",
+          "signed": false
         },
         {
           "name": "VCU_Mode",
@@ -38,7 +40,8 @@
           "min": 0,
           "max": 15,
           "unit": "",
-          "endianness": "big"
+          "endianness": "big",
+          "signed": false
         },
         {
           "name": "VCU_CurrentGear",
@@ -49,7 +52,8 @@
           "min": 0,
           "max": 15,
           "unit": "",
-          "endianness": "big"
+          "endianness": "big",
+          "signed": false
         },
         {
           "name": "VCU_BrkPres",
@@ -60,7 +64,8 @@
           "min": 0,
           "max": 10,
           "unit": "Mpa",
-          "endianness": "big"
+          "endianness": "big",
+          "signed": false
         },
         {
           "name": "VCU_VehAngSpeed",
@@ -71,7 +76,8 @@
           "min": -128,
           "max": 127,
           "unit": "deg/s",
-          "endianness": "big"
+          "endianness": "big",
+          "signed": false
         }
       ]
     },
@@ -91,7 +97,8 @@
           "min": 0,
           "max": 8031.875,
           "unit": "rpm",
-          "endianness": "big"
+          "endianness": "big",
+          "signed": false
         },
         {
           "name": "EEC1_ActEngPcntTrq",
@@ -102,7 +109,8 @@
           "min": -125,
           "max": 125,
           "unit": "%",
-          "endianness": "big"
+          "endianness": "big",
+          "signed": false
         },
         {
           "name": "EEC1_DemandPcntTrq",
@@ -113,7 +121,8 @@
           "min": -125,
           "max": 125,
           "unit": "%",
-          "endianness": "big"
+          "endianness": "big",
+          "signed": false
         },
         {
           "name": "EEC1_DriverDemandPcntTrq",
@@ -124,7 +133,8 @@
           "min": -125,
           "max": 125,
           "unit": "%",
-          "endianness": "big"
+          "endianness": "big",
+          "signed": false
         },
         {
           "name": "EEC1_EngTrqMode",
@@ -135,7 +145,8 @@
           "min": 0,
           "max": 15,
           "unit": "",
-          "endianness": "big"
+          "endianness": "big",
+          "signed": false
         },
         {
           "name": "EEC1_EngStarterMode",
@@ -146,11 +157,127 @@
           "min": 0,
           "max": 15,
           "unit": "",
-          "endianness": "big"
+          "endianness": "big",
+          "signed": false
         }
       ]
+    },
+    {
+      "id": 262,
+      "name": "IPC_Land_CtrlCmd",
+      "length": 8,
+      "signals": [
+        {
+          "name": "IPC_Land_Angle",
+          "startBit": 47,
+          "length": 8,
+          "factor": 1,
+          "offset": -90,
+          "min": -90,
+          "max": 90,
+          "unit": "deg",
+          "endianness": "big",
+          "signed": false
+        },
+        {
+          "name": "IPC_Land_WorkMode",
+          "startBit": 35,
+          "length": 4,
+          "factor": 1,
+          "offset": 0,
+          "min": 0,
+          "max": 15,
+          "unit": "",
+          "endianness": "big",
+          "signed": false
+        },
+        {
+          "name": "IPC_Land_TakeOverReq",
+          "startBit": 39,
+          "length": 2,
+          "factor": 1,
+          "offset": 0,
+          "min": 0,
+          "max": 3,
+          "unit": "",
+          "endianness": "big",
+          "signed": false
+        },
+        {
+          "name": "IPC_Land_EPBReq",
+          "startBit": 37,
+          "length": 2,
+          "factor": 1,
+          "offset": 0,
+          "min": 0,
+          "max": 3,
+          "unit": "",
+          "endianness": "big",
+          "signed": false
+        },
+        {
+          "name": "IPC_Land_LifeCnt",
+          "startBit": 27,
+          "length": 4,
+          "factor": 1,
+          "offset": 0,
+          "min": 0,
+          "max": 15,
+          "unit": "",
+          "endianness": "big",
+          "signed": false
+        },
+        {
+          "name": "IPC_Land_CheckSum",
+          "startBit": 63,
+          "length": 8,
+          "factor": 1,
+          "offset": 0,
+          "min": 0,
+          "max": 255,
+          "unit": "",
+          "endianness": "big",
+          "signed": false
+        },
+        {
+          "name": "IPC_Land_TargetGear",
+          "startBit": 31,
+          "length": 4,
+          "factor": 1,
+          "offset": 0,
+          "min": 0,
+          "max": 15,
+          "unit": "",
+          "endianness": "big",
+          "signed": false
+        },
+        {
+          "name": "IPC_Land_TargetAngSpd",
+          "startBit": 7,
+          "length": 12,
+          "factor": 0.1,
+          "offset": -128,
+          "min": -128,
+          "max": 127,
+          "unit": "deg/s",
+          "endianness": "big",
+          "signed": false
+        },
+        {
+          "name": "IPC_Land_TargetSpd",
+          "startBit": 11,
+          "length": 12,
+          "factor": 0.05,
+          "offset": 0,
+          "min": 0,
+          "max": 60,
+          "unit": "km/h",
+          "endianness": "big",
+          "signed": false
+        }
+      ],
+      "sender": "IPC_Land"
     }
   ],
   "valTables": {}
 }
-

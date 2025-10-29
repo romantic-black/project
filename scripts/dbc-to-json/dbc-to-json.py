@@ -35,6 +35,7 @@ def parse_dbc(dbc_path: str) -> dict:
                 "offset": signal.offset if signal.offset else 0,
                 "unit": signal.unit if signal.unit else "",
                 "endianness": "big" if signal.byte_order == "big_endian" else "little",
+                "signed": bool(getattr(signal, "is_signed", False)),
             }
             
             if signal.minimum is not None:
