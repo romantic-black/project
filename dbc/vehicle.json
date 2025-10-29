@@ -1,0 +1,156 @@
+{
+  "messages": [
+    {
+      "id": 320,
+      "name": "VCU_Info1",
+      "length": 8,
+      "sender": "VCU",
+      "cycleTime": 100,
+      "signals": [
+        {
+          "name": "VCU_VehSpeed",
+          "startBit": 19,
+          "length": 12,
+          "factor": 0.05,
+          "offset": 0,
+          "min": 0,
+          "max": 200,
+          "unit": "km/h",
+          "endianness": "big"
+        },
+        {
+          "name": "VCU_BatSOC",
+          "startBit": 15,
+          "length": 12,
+          "factor": 0.1,
+          "offset": 0,
+          "min": 0,
+          "max": 100,
+          "unit": "%",
+          "endianness": "big"
+        },
+        {
+          "name": "VCU_Mode",
+          "startBit": 7,
+          "length": 4,
+          "factor": 1,
+          "offset": 0,
+          "min": 0,
+          "max": 15,
+          "unit": "",
+          "endianness": "big"
+        },
+        {
+          "name": "VCU_CurrentGear",
+          "startBit": 55,
+          "length": 4,
+          "factor": 1,
+          "offset": 0,
+          "min": 0,
+          "max": 15,
+          "unit": "",
+          "endianness": "big"
+        },
+        {
+          "name": "VCU_BrkPres",
+          "startBit": 47,
+          "length": 8,
+          "factor": 0.1,
+          "offset": 0,
+          "min": 0,
+          "max": 10,
+          "unit": "Mpa",
+          "endianness": "big"
+        },
+        {
+          "name": "VCU_VehAngSpeed",
+          "startBit": 51,
+          "length": 12,
+          "factor": 0.1,
+          "offset": -128,
+          "min": -128,
+          "max": 127,
+          "unit": "deg/s",
+          "endianness": "big"
+        }
+      ]
+    },
+    {
+      "id": 340,
+      "name": "J1939_EEC1",
+      "length": 8,
+      "sender": "VCU",
+      "cycleTime": 10,
+      "signals": [
+        {
+          "name": "EEC1_EngSpeed",
+          "startBit": 31,
+          "length": 16,
+          "factor": 0.125,
+          "offset": 0,
+          "min": 0,
+          "max": 8031.875,
+          "unit": "rpm",
+          "endianness": "big"
+        },
+        {
+          "name": "EEC1_ActEngPcntTrq",
+          "startBit": 23,
+          "length": 8,
+          "factor": 1,
+          "offset": -125,
+          "min": -125,
+          "max": 125,
+          "unit": "%",
+          "endianness": "big"
+        },
+        {
+          "name": "EEC1_DemandPcntTrq",
+          "startBit": 15,
+          "length": 8,
+          "factor": 1,
+          "offset": -125,
+          "min": -125,
+          "max": 125,
+          "unit": "%",
+          "endianness": "big"
+        },
+        {
+          "name": "EEC1_DriverDemandPcntTrq",
+          "startBit": 63,
+          "length": 8,
+          "factor": 1,
+          "offset": -125,
+          "min": -125,
+          "max": 125,
+          "unit": "%",
+          "endianness": "big"
+        },
+        {
+          "name": "EEC1_EngTrqMode",
+          "startBit": 7,
+          "length": 4,
+          "factor": 1,
+          "offset": 0,
+          "min": 0,
+          "max": 15,
+          "unit": "",
+          "endianness": "big"
+        },
+        {
+          "name": "EEC1_EngStarterMode",
+          "startBit": 55,
+          "length": 4,
+          "factor": 1,
+          "offset": 0,
+          "min": 0,
+          "max": 15,
+          "unit": "",
+          "endianness": "big"
+        }
+      ]
+    }
+  ],
+  "valTables": {}
+}
+
