@@ -43,7 +43,9 @@ async function main() {
     const msg = normalizeFrame(frame);
     if (!msg) return;
 
-    for (const [signalName, value] of Object.entries(msg.values)) {
+    for (const signalName of Object.keys(msg.values)) {
+      const value = msg.values[signalName];
+      if (typeof value !== 'number') continue;
       dbRepo.batchInsertSignalValue(msg.timestamp, signalName, value);
     }
 

@@ -2,7 +2,7 @@ import { useTelemetryStore } from '../stores/telemetry';
 import { useEffect, useState } from 'react';
 
 export function HeartbeatIndicator() {
-  const { connected, lastUpdate } = useTelemetryStore();
+  const { connected } = useTelemetryStore();
   const [isBlinking, setIsBlinking] = useState(false);
 
   useEffect(() => {

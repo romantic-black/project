@@ -5,6 +5,7 @@ import { ChartContainer } from '../components/ChartContainer';
 import { getValTableText } from '../utils/dbc';
 import * as echarts from 'echarts';
 import { useSignalHistory } from '../hooks/useSignalHistory';
+import { combineHistoryWithLatest } from '../utils/chart';
 
 export default function Engine() {
   const { getSignal, messages } = useTelemetryStore();
@@ -56,10 +57,7 @@ export default function Engine() {
           smooth: false,
           showSymbol: false,
           areaStyle: { opacity: 0.15 },
-          data: [
-            ...torqueHistory.map((item) => [item.timestamp, item.value]),
-            ...(eec1Timestamp ? [[eec1Timestamp, torque ?? 0]] : []),
-          ],
+          data: combineHistoryWithLatest(torqueHistory, eec1Timestamp, torque ?? undefined),
           yAxisIndex: 0,
         },
         {
@@ -67,10 +65,7 @@ export default function Engine() {
           type: 'line',
           smooth: false,
           showSymbol: false,
-          data: [
-            ...speedHistory.map((item) => [item.timestamp, item.value]),
-            ...(eec1Timestamp ? [[eec1Timestamp, speed ?? 0]] : []),
-          ],
+          data: combineHistoryWithLatest(speedHistory, eec1Timestamp, speed ?? undefined),
           yAxisIndex: 1,
         },
         {
@@ -78,10 +73,7 @@ export default function Engine() {
           type: 'line',
           smooth: false,
           showSymbol: false,
-          data: [
-            ...loadHistory.map((item) => [item.timestamp, item.value]),
-            ...(eec2Timestamp ? [[eec2Timestamp, load ?? 0]] : []),
-          ],
+          data: combineHistoryWithLatest(loadHistory, eec2Timestamp, load ?? undefined),
           yAxisIndex: 0,
         },
         {
@@ -89,25 +81,24 @@ export default function Engine() {
           type: 'line',
           smooth: false,
           showSymbol: false,
-          data: [
-            ...throttleHistory.map((item) => [item.timestamp, item.value]),
-            ...(eec2Timestamp ? [[eec2Timestamp, throttle ?? 0]] : []),
-          ],
+          data: combineHistoryWithLatest(throttleHistory, eec2Timestamp, throttle ?? undefined),
           yAxisIndex: 0,
         },
       ],
-  }), [
-    loadHistory,
-    speedHistory,
-    throttleHistory,
-    torqueHistory,
-    torque,
-    speed,
-    load,
-    throttle,
-    eec1Timestamp,
-    eec2Timestamp,
-  ]);
+    }),
+    [
+      eec1Timestamp,
+      eec2Timestamp,
+      load,
+      loadHistory,
+      speed,
+      speedHistory,
+      throttle,
+      throttleHistory,
+      torque,
+      torqueHistory,
+    ]
+  );
 
   return (
     <div className="px-4 sm:px-6 lg:px-8">

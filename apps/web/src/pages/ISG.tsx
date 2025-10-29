@@ -4,6 +4,7 @@ import { SignalCard } from '../components/SignalCard';
 import { ChartContainer } from '../components/ChartContainer';
 import * as echarts from 'echarts';
 import { useSignalHistory } from '../hooks/useSignalHistory';
+import { combineHistoryWithLatest } from '../utils/chart';
 
 export default function ISG() {
   const { getSignal, messages } = useTelemetryStore();
@@ -78,10 +79,7 @@ export default function ISG() {
           type: 'line',
           smooth: false,
           showSymbol: false,
-          data: [
-            ...speedHistory.map((item) => [item.timestamp, item.value]),
-            ...(isgInfo1Timestamp ? [[isgInfo1Timestamp, speed ?? 0]] : []),
-          ],
+          data: combineHistoryWithLatest(speedHistory, isgInfo1Timestamp, speed ?? undefined),
           yAxisIndex: 0,
         },
         {
@@ -90,20 +88,13 @@ export default function ISG() {
           smooth: false,
           showSymbol: false,
           areaStyle: { opacity: 0.15 },
-          data: [
-            ...torqueHistory.map((item) => [item.timestamp, item.value]),
-            ...(isgInfo1Timestamp ? [[isgInfo1Timestamp, torque ?? 0]] : []),
-          ],
+          data: combineHistoryWithLatest(torqueHistory, isgInfo1Timestamp, torque ?? undefined),
           yAxisIndex: 1,
         },
       ],
-  }), [
-    speedHistory,
-    torqueHistory,
-    speed,
-    torque,
-    isgInfo1Timestamp,
-  ]);
+    }),
+    [isgInfo1Timestamp, speed, speedHistory, torque, torqueHistory]
+  );
 
   const powerChartOption: echarts.EChartsOption = useMemo(
     () => ({
@@ -135,10 +126,7 @@ export default function ISG() {
           type: 'line',
           smooth: false,
           showSymbol: false,
-          data: [
-            ...voltageHistory.map((item) => [item.timestamp, item.value]),
-            ...(isgInfo2Timestamp ? [[isgInfo2Timestamp, voltage ?? 0]] : []),
-          ],
+          data: combineHistoryWithLatest(voltageHistory, isgInfo2Timestamp, voltage ?? undefined),
           yAxisIndex: 0,
         },
         {
@@ -146,10 +134,7 @@ export default function ISG() {
           type: 'line',
           smooth: false,
           showSymbol: false,
-          data: [
-            ...currentHistory.map((item) => [item.timestamp, item.value]),
-            ...(isgInfo2Timestamp ? [[isgInfo2Timestamp, current ?? 0]] : []),
-          ],
+          data: combineHistoryWithLatest(currentHistory, isgInfo2Timestamp, current ?? undefined),
           yAxisIndex: 1,
         },
         {
@@ -158,22 +143,13 @@ export default function ISG() {
           smooth: false,
           showSymbol: false,
           areaStyle: { opacity: 0.15 },
-          data: [
-            ...powerHistory.map((item) => [item.timestamp, item.value]),
-            ...(isgInfo2Timestamp ? [[isgInfo2Timestamp, power ?? 0]] : []),
-          ],
+          data: combineHistoryWithLatest(powerHistory, isgInfo2Timestamp, power ?? undefined),
           yAxisIndex: 1,
         },
       ],
-  }), [
-    currentHistory,
-    powerHistory,
-    voltageHistory,
-    voltage,
-    current,
-    power,
-    isgInfo2Timestamp,
-  ]);
+    }),
+    [current, currentHistory, isgInfo2Timestamp, power, powerHistory, voltage, voltageHistory]
+  );
 
   return (
     <div className="px-4 sm:px-6 lg:px-8">
