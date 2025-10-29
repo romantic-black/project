@@ -65,17 +65,22 @@ export function encodeBits(
     throw new Error(`Invalid bit range: start=${startBit}, length=${length}`);
   }
 
+  if (length > 53) {
+    throw new Error('encodeBits only supports signal lengths up to 53 bits');
+  }
+
+  const maxUnsignedValue = Math.pow(2, length);
+  const mask = maxUnsignedValue - 1;
+
   // Handle signed values - convert to unsigned representation
-  let unsignedValue: number;
-  if (length < 32) {
-    if (value < 0) {
-      // Convert signed negative value to unsigned
-      unsignedValue = value & ((1 << length) - 1);
-    } else {
-      unsignedValue = value;
-    }
-  } else {
-    unsignedValue = value < 0 ? (value >>> 0) : value;
+  let unsignedValue = Math.trunc(value);
+  if (value < 0) {
+    const normalized = (maxUnsignedValue + (value % maxUnsignedValue)) % maxUnsignedValue;
+    unsignedValue = Math.trunc(normalized);
+  }
+
+  if (unsignedValue < 0 || unsignedValue > mask) {
+    unsignedValue = Math.max(0, Math.min(mask, unsignedValue));
   }
 
   const endBit = startBit + length - 1;
@@ -92,7 +97,7 @@ export function encodeBits(
       if (byteIndex < data.length) {
         // Calculate which bit of the value corresponds to this position
         const valueBitIndex = bit - startBit;
-        const bitValue = (unsignedValue >> (length - 1 - valueBitIndex)) & 1;
+        const bitValue = Math.floor(unsignedValue / Math.pow(2, length - 1 - valueBitIndex)) & 1;
         
         if (bitValue) {
           data[byteIndex] |= (1 << bitIndex);
@@ -112,7 +117,7 @@ export function encodeBits(
       if (byteIndex < data.length) {
         // Calculate which bit of the value corresponds to this position
         const valueBitIndex = bit - startBit;
-        const bitValue = (unsignedValue >> valueBitIndex) & 1;
+        const bitValue = Math.floor(unsignedValue / Math.pow(2, valueBitIndex)) & 1;
         
         if (bitValue) {
           data[byteIndex] |= (1 << bitIndex);
