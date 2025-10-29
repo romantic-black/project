@@ -21,7 +21,7 @@ export function normalizeFrame(frame: CanFrame): MessageData | null {
     const bigEndian = isBigEndian(signal.endianness);
 
     try {
-      const rawValue = extractBits(frame.data, startBit, length, bigEndian);
+      const rawValue = extractBits(frame.data, startBit, length, bigEndian, signal.signed ?? false);
       const scaledValue = applyScale(rawValue, signal.factor ?? 1, signal.offset ?? 0);
       const clampedValue = clamp(scaledValue, signal.min, signal.max);
 

@@ -1,4 +1,10 @@
-export function extractBits(data: Buffer, startBit: number, length: number, isBigEndian: boolean = true): number {
+export function extractBits(
+  data: Buffer,
+  startBit: number,
+  length: number,
+  isBigEndian: boolean = true,
+  isSigned: boolean = false
+): number {
   if (startBit < 0 || length <= 0 || length > 64) {
     throw new Error(`Invalid bit range: start=${startBit}, length=${length}`);
   }
@@ -26,10 +32,19 @@ export function extractBits(data: Buffer, startBit: number, length: number, isBi
     }
   }
 
-  if (length < 32) {
-    const signBit = 1 << (length - 1);
-    if (value & signBit) {
-      value = value | (~((1 << length) - 1));
+  if (isSigned) {
+    if (length < 32) {
+      const signBit = 1 << (length - 1);
+      if (value & signBit) {
+        value |= ~((1 << length) - 1);
+      }
+    } else if (length === 32) {
+      value = value | 0;
+    } else if (length < 53) {
+      const signBit = Math.pow(2, length - 1);
+      if (value >= signBit) {
+        value -= Math.pow(2, length);
+      }
     }
   }
 
