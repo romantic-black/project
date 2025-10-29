@@ -14,7 +14,7 @@ export class WSServer {
   private wss: WebSocketServer;
   private messageBuffer: Map<string, MessageData> = new Map();
   private bufferMaxSize = 1000;
-  private heartbeatInterval: NodeJS.Timeout;
+  private heartbeatInterval?: NodeJS.Timeout;
 
   constructor(port: number) {
     this.wss = new WebSocketServer({ port });
@@ -108,7 +108,9 @@ export class WSServer {
     
     if (this.messageBuffer.size >= this.bufferMaxSize) {
       const firstKey = this.messageBuffer.keys().next().value;
-      this.messageBuffer.delete(firstKey);
+      if (firstKey) {
+        this.messageBuffer.delete(firstKey);
+      }
     }
     this.messageBuffer.set(topic, msg);
 
@@ -130,7 +132,10 @@ export class WSServer {
   }
 
   close(): void {
-    clearInterval(this.heartbeatInterval);
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = undefined;
+    }
     this.wss.close();
   }
 }

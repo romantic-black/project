@@ -6,13 +6,13 @@ import { encodeBits, inverseScale, isBigEndian, clamp } from '../decoder/bitops.
 export class MockSource implements ICanSource {
   private frameCallback?: (frame: CanFrame) => void;
   private intervals: NodeJS.Timeout[] = [];
-  private stats: SourceStats = { frames: 0, errors: 0 };
+  private statsState: SourceStats = { frames: 0, errors: 0 };
   private isRunning = false;
 
   async start(): Promise<void> {
     if (this.isRunning) return;
     this.isRunning = true;
-    this.stats = { frames: 0, errors: 0 };
+    this.statsState = { frames: 0, errors: 0 };
 
     let messages: any[] = [];
     try {
@@ -79,7 +79,7 @@ export class MockSource implements ICanSource {
         };
 
         this.frameCallback(frame);
-        this.stats.frames++;
+        this.statsState.frames++;
       }, cycleTime);
 
       this.intervals.push(interval);
@@ -103,7 +103,7 @@ export class MockSource implements ICanSource {
   }
 
   stats(): SourceStats {
-    return { ...this.stats };
+    return { ...this.statsState };
   }
 }
 

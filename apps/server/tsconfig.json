@@ -11,7 +11,12 @@
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": "./src",
+    "paths": {
+      "@can-telemetry/common": ["../../packages/common/src/index.ts"],
+      "@can-telemetry/common/*": ["../../packages/common/src/*"]
+    }
   },
   "include": ["src/**/*"],
   "references": [{ "path": "../../packages/common" }]

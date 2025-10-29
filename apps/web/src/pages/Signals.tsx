@@ -1,5 +1,4 @@
 import { useTelemetryStore } from '../stores/telemetry';
-import { formatUnit } from '../utils/format';
 
 export default function Signals() {
   const { messages } = useTelemetryStore();

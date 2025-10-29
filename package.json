@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "pnpm --parallel --filter './apps/*' dev",
-    "build": "pnpm --filter './apps/*' build",
+    "build": "pnpm --filter './packages/*' build && pnpm --filter './apps/*' build",
     "db:push": "pnpm --filter server db:push",
     "seed": "pnpm --filter server seed"
   },

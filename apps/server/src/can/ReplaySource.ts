@@ -10,7 +10,7 @@ export class ReplaySource implements ICanSource {
   private currentIndex = 0;
   private timeout?: NodeJS.Timeout;
   private startTime?: number;
-  private stats: SourceStats = { frames: 0, errors: 0 };
+  private statsState: SourceStats = { frames: 0, errors: 0 };
   private isRunning = false;
 
   constructor() {
@@ -35,7 +35,7 @@ export class ReplaySource implements ICanSource {
     }
 
     this.isRunning = true;
-    this.stats = { frames: 0, errors: 0 };
+    this.statsState = { frames: 0, errors: 0 };
     this.currentIndex = 0;
     this.startTime = Date.now();
     this.scheduleNext();
@@ -69,7 +69,7 @@ export class ReplaySource implements ICanSource {
           timestamp: Date.now(),
         };
         this.frameCallback(canFrame);
-        this.stats.frames++;
+        this.statsState.frames++;
       }
       this.currentIndex++;
       this.scheduleNext();
@@ -93,7 +93,7 @@ export class ReplaySource implements ICanSource {
   }
 
   stats(): SourceStats {
-    return { ...this.stats, lastFrameTime: this.startTime };
+    return { ...this.statsState, lastFrameTime: this.startTime };
   }
 }
 
