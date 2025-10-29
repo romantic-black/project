@@ -61,7 +61,7 @@ export class MockSource implements ICanSource {
             }
 
             // Ensure raw value fits in the bit range
-            const isSigned = (signal.min ?? 0) < 0;
+            const isSigned = signal.signed ?? (signal.min ?? 0) < 0;
             const maxRawValue = isSigned ? Math.pow(2, length - 1) - 1 : Math.pow(2, length) - 1;
             const minRawValue = isSigned ? -Math.pow(2, length - 1) : 0;
             const clampedRawValue = Math.max(minRawValue, Math.min(maxRawValue, rawValue));

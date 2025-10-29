@@ -12,6 +12,7 @@ export interface DbcSignal {
   max?: number;
   unit?: string;
   endianness?: 'little' | 'big';
+  signed?: boolean;
   valTable?: Record<number, string>;
   comment?: string;
 }
@@ -43,7 +44,17 @@ class DbcLoader {
         ? config.DBC_JSON
         : join(PROJECT_ROOT, config.DBC_JSON);
       const content = readFileSync(filePath, 'utf-8');
-      this.dbcData = JSON.parse(content) as DbcData;
+      const parsed = JSON.parse(content) as DbcData;
+      this.dbcData = {
+        ...parsed,
+        messages: parsed.messages.map((message) => ({
+          ...message,
+          signals: message.signals.map((signal) => ({
+            ...signal,
+            signed: signal.signed ?? false,
+          })),
+        })),
+      };
       return this.dbcData;
     } catch (error) {
       console.error(`Failed to load DBC file: ${config.DBC_JSON}`, error);
