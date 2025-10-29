@@ -50,44 +50,51 @@ export class DbRepo {
       for (const [signalName, values] of grouped.entries()) {
         if (values.length === 0) continue;
 
-        const latest = values[values.length - 1];
-        const first = values[0];
-        const sum = values.reduce((acc, v) => acc + v.value, 0);
-        const avg = sum / values.length;
-        const max = Math.max(...values.map((v) => v.value));
-        const min = Math.min(...values.map((v) => v.value));
-
         const oneSecondWindow = values.filter((v) => v.timestamp >= oneSecondAgo);
         if (oneSecondWindow.length > 0) {
-          const agg1s = this.db
+          const last1s = oneSecondWindow[oneSecondWindow.length - 1];
+          const first1s = oneSecondWindow[0];
+          const sum1s = oneSecondWindow.reduce((acc, v) => acc + v.value, 0);
+          const avg1s = sum1s / oneSecondWindow.length;
+          const max1s = Math.max(...oneSecondWindow.map((v) => v.value));
+          const min1s = Math.min(...oneSecondWindow.map((v) => v.value));
+
+          this.db
             .prepare(
               'INSERT INTO signals_agg_1s (timestamp, signal_name, last_value, first_value, avg_value, max_value, min_value) VALUES (?, ?, ?, ?, ?, ?, ?)'
             )
             .run(
               Math.floor(oneSecondAgo / 1000) * 1000,
               signalName,
-              latest.value,
-              first.value,
-              avg,
-              max,
-              min
+              last1s.value,
+              first1s.value,
+              avg1s,
+              max1s,
+              min1s
             );
         }
 
         const tenSecondWindow = values.filter((v) => v.timestamp >= tenSecondsAgo);
         if (tenSecondWindow.length > 0) {
-          const agg10s = this.db
+          const last10s = tenSecondWindow[tenSecondWindow.length - 1];
+          const first10s = tenSecondWindow[0];
+          const sum10s = tenSecondWindow.reduce((acc, v) => acc + v.value, 0);
+          const avg10s = sum10s / tenSecondWindow.length;
+          const max10s = Math.max(...tenSecondWindow.map((v) => v.value));
+          const min10s = Math.min(...tenSecondWindow.map((v) => v.value));
+
+          this.db
             .prepare(
               'INSERT INTO signals_agg_10s (timestamp, signal_name, last_value, first_value, avg_value, max_value, min_value) VALUES (?, ?, ?, ?, ?, ?, ?)'
             )
             .run(
               Math.floor(tenSecondsAgo / 10000) * 10000,
               signalName,
-              latest.value,
-              first.value,
-              avg,
-              max,
-              min
+              last10s.value,
+              first10s.value,
+              avg10s,
+              max10s,
+              min10s
             );
         }
       }
