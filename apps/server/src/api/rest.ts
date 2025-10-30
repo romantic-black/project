@@ -19,7 +19,7 @@ export function setupRestApi(app: express.Application): void {
       const snapshot = dbRepo.getSnapshot(query.signals);
       res.json(snapshot);
     } catch (error) {
-      logger.error({ error, query: req.query }, 'Snapshot query error');
+      logger.error('Snapshot query error', { error, query: req.query });
       res.status(400).json({ error: 'Invalid query parameters' });
     }
   });
@@ -33,7 +33,7 @@ export function setupRestApi(app: express.Application): void {
       const history = dbRepo.queryHistory(query.signals, from, to, query.step);
       res.json(history);
     } catch (error) {
-      logger.error({ error, query: req.query }, 'History query error');
+      logger.error('History query error', { error, query: req.query });
       res.status(400).json({ error: 'Invalid query parameters' });
     }
   });
@@ -140,7 +140,7 @@ export function setupRestApi(app: express.Application): void {
       await canSource.sendFrame(id, buffer);
       res.json({ success: true });
     } catch (error) {
-      logger.error({ error }, 'Send frame error');
+      logger.error('Send frame error', { error });
       res.status(500).json({ error: 'Failed to send frame' });
     }
   });

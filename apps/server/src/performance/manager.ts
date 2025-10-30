@@ -107,11 +107,11 @@ export class PerformanceManager {
     );
 
     return {
-      cpuUsage: avg.cpuUsage / recent.length,
+      cpuUsage: (avg.cpuUsage ?? 0) / recent.length,
       memoryUsage: avg.memoryUsage / recent.length,
       queueLength: avg.queueLength / recent.length,
-      processingTime: avg.processingTime / recent.length,
-      throughput: avg.throughput / recent.length,
+      processingTime: (avg.processingTime ?? 0) / recent.length,
+      throughput: (avg.throughput ?? 0) / recent.length,
       timestamp: avg.timestamp,
     };
   }

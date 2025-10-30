@@ -88,7 +88,7 @@ async function main() {
 }
 
 main().catch((error) => {
-  logger.error({ error }, 'Fatal error');
+  logger.error('Fatal error', { error });
   process.exit(1);
 });
 

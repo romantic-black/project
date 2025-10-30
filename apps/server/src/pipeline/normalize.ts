@@ -3,6 +3,7 @@ import type { CanFrame } from '@can-telemetry/common';
 import dbcLoader from '../dbc/loader.js';
 import { extractBits, applyScale, clamp, isBigEndian } from '../decoder/bitops.js';
 import { checkLifeCnt, checkXorChecksum } from '../decoder/checks.js';
+import config from '../config.js';
 import { createLogger } from '../utils/logger.js';
 import { canDiagnostics } from '../dbc/diagnostics.js';
 import { healthMonitor } from '../monitoring/health.js';
@@ -74,7 +75,7 @@ export function normalizeFrame(frame: CanFrame): MessageData | null {
       }
 
       // Checksum check
-      if (signal.name.includes('CheckSum')) {
+      if (signal.name.includes('CheckSum') && config.CHECKSUM_VALIDATION) {
         const calculatedXor = frame.data.reduce((xor, byte, idx) => (idx < 7 ? xor ^ byte : xor), 0);
         const isValid = checkXorChecksum(frame.data, clampedValue);
         

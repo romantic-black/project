@@ -25,6 +25,7 @@ const configSchema = z.object({
   ENABLE_RAW_FRAME_LOG: z.coerce.boolean().default(false).optional(),
   DIAGNOSTICS_ENABLED: z.coerce.boolean().default(true).optional(),
   HEALTH_CHECK_INTERVAL: z.coerce.number().default(30).optional(),
+  CHECKSUM_VALIDATION: z.coerce.boolean().default(true).optional(),
 });
 
 export type Config = z.infer<typeof configSchema>;

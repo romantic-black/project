@@ -30,7 +30,7 @@ export class WSServer {
         logger.error(`Port ${port} is already in use. Please close the process using this port or change the WS_PORT environment variable.`);
         logger.error('To find the process using the port, run: lsof -i :' + port + ' or ss -tlnp | grep :' + port);
       } else {
-        logger.error({ error }, 'WebSocket server error');
+        logger.error('WebSocket server error', { error });
       }
     });
   }
@@ -66,7 +66,7 @@ export class WSServer {
             ws.lastPing = Date.now();
           }
         } catch (error) {
-          logger.warn({ error }, 'Invalid WebSocket message');
+          logger.warn('Invalid WebSocket message', { error });
         }
       });
 
