@@ -214,6 +214,59 @@ rm -rf node_modules apps/*/node_modules packages/*/node_modules
 pnpm install
 ```
 
+### 3.1 解决 pnpm db:push 报错（better-sqlite3 绑定缺失）
+
+当运行 `pnpm db:push` 报错，提示 `Could not locate the bindings file`（better-sqlite3 原生绑定缺失），通常是 pnpm v10 的“构建脚本审批”机制未允许构建 `better-sqlite3`，导致预编译或源码编译未执行。
+
+请按以下步骤处理：
+
+1) 在仓库根目录 `package.json` 添加以下字段（已为你提交）：
+
+```json
+{
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild",
+      "socketcan"
+    ]
+  }
+}
+```
+
+2) 重新安装依赖以触发允许的构建脚本：
+
+```bash
+pnpm install --force
+```
+
+3) 如果仍报错，安装本机构建工具与 SQLite 头文件（WSL/Ubuntu）：
+
+```bash
+sudo apt-get update -y
+sudo apt-get install -y build-essential python3 make g++ libsqlite3-dev
+```
+
+4) 强制重建 `better-sqlite3`（可选）：
+
+```bash
+pnpm rebuild better-sqlite3
+```
+
+5) 再次执行数据库初始化：
+
+```bash
+pnpm db:push
+```
+
+如果你偏好交互式审批（不修改 package.json），可执行：
+
+```bash
+pnpm approve-builds
+# 在列表中勾选 better-sqlite3（以及 esbuild、socketcan 如需）
+pnpm install --force
+```
+
 **⚠️ 常见问题**：
 
 1. **问题**: `better-sqlite3` 编译失败，架构不匹配错误

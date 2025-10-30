@@ -1,11 +1,11 @@
 import Database from 'better-sqlite3';
 import { mkdir } from 'fs/promises';
-import { dirname } from 'path';
-import config from '../config.js';
+import { dirname, join } from 'path';
+import config, { PROJECT_ROOT } from '../config.js';
 
-const dbPath = config.DB_PATH.startsWith('/') 
-  ? config.DB_PATH 
-  : `${process.cwd()}/${config.DB_PATH}`;
+const dbPath = config.DB_PATH.startsWith('/')
+  ? config.DB_PATH
+  : join(PROJECT_ROOT, config.DB_PATH);
 
 async function main() {
   console.log('Creating database tables...');
