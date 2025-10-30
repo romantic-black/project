@@ -56,9 +56,13 @@ export class CanDiagnostics {
       failureReason: context.failureReason,
       expectedValue: context.expectedValue,
       actualValue: context.actualValue,
-      rawData: context.rawData instanceof Buffer
-        ? context.rawData.toString('hex')
-        : context.rawData,
+      rawData: context.rawData == null
+        ? undefined
+        : (typeof context.rawData === 'string'
+          ? context.rawData
+          : (Buffer.isBuffer(context.rawData)
+            ? context.rawData.toString('hex')
+            : String(context.rawData))),
     };
 
     // Log to logger
