@@ -1,4 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws';
+import type { IncomingMessage } from 'http';
 import type { MessageData } from '@can-telemetry/common';
 import config from '../config.js';
 import { createLogger } from '../utils/logger.js';
@@ -10,6 +11,13 @@ const logger = createLogger('ws-server');
 interface WsClient extends WebSocket {
   subscribedTopics?: Set<string>;
   lastPing?: number;
+}
+
+function headerToString(value: string | string[] | undefined): string | undefined {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  return value;
 }
 
 export class WSServer {
@@ -45,13 +53,25 @@ export class WSServer {
   }
 
   private setupHandlers(): void {
-    this.wss.on('connection', (ws: WsClient) => {
+    this.wss.on('connection', (ws: WsClient, request: IncomingMessage) => {
       ws.subscribedTopics = new Set();
       ws.lastPing = Date.now();
-      const clientId = `client-${Date.now()}`;
-      const ip = (ws as any)._socket?.remoteAddress || 'unknown';
+      const clientId = `client-${Date.now()}-${Math.round(Math.random() * 1_000_000)}`;
+      const socket = request.socket || (ws as any)._socket;
+      const ip =
+        socket?.remoteAddress ||
+        headerToString(request.headers['x-real-ip']) ||
+        headerToString(request.headers['x-forwarded-for']) ||
+        'unknown';
+      const wsPath = request.url || '/';
+      const originHeader = headerToString(request.headers.origin) ?? 'unknown';
+      const userAgentHeader = headerToString(request.headers['user-agent']) ?? 'unknown';
+
       logger.logWsClientConnect(clientId, ip, {
         dataMode: config.DATA_MODE,
+        path: wsPath,
+        origin: originHeader,
+        userAgent: userAgentHeader,
       });
       transportMonitor.recordWsClientConnect(clientId, ip);
 
@@ -93,9 +113,18 @@ export class WSServer {
         }
       });
 
-      ws.on('close', () => {
-        logger.logWsClientDisconnect(clientId, 'normal_close');
-        transportMonitor.recordWsClientDisconnect(clientId, 'normal_close');
+      ws.on('close', (code, reason) => {
+        const reasonText =
+          typeof reason === 'string'
+            ? reason
+            : reason instanceof Buffer
+              ? reason.toString('utf8')
+              : '';
+        const closeReason = reasonText || 'connection_closed';
+        logger.logWsClientDisconnect(clientId, closeReason, {
+          closeCode: code,
+        });
+        transportMonitor.recordWsClientDisconnect(clientId, closeReason);
       });
 
       ws.on('error', (error) => {
@@ -232,4 +261,3 @@ export class WSServer {
     this.wss.close();
   }
 }
-

@@ -61,7 +61,7 @@ export class EnhancedLogger {
     timestamp: number,
     context?: LogContext
   ): void {
-    this.logger.info({
+    this.logger.debug({
       operation: 'can_frame_received',
       frameId,
       dataLength,
@@ -185,7 +185,7 @@ export class EnhancedLogger {
     duration: number,
     context?: LogContext
   ): void {
-    this.logger.info({
+    this.logger.debug({
       operation: 'db_operation',
       dbOperation: operation,
       tableName,
@@ -220,7 +220,7 @@ export class EnhancedLogger {
     duration: number,
     context?: LogContext
   ): void {
-    this.logger.info({
+    this.logger.debug({
       operation: 'db_flush',
       bufferSize,
       successCount,

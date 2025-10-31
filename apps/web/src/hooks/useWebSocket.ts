@@ -5,20 +5,27 @@ import type { MessageData } from '@can-telemetry/common';
 function resolveWsUrl(): string {
 	const explicitUrl = import.meta.env.VITE_WS_URL;
 	if (explicitUrl && explicitUrl.length > 0) {
+		console.log('Using VITE_WS_URL:', explicitUrl);
+		console.log('Current location:', window.location.href);
 		return explicitUrl;
 	}
 
 	// Default to same-origin relative path; Vite dev server proxies '/ws' → ws backend
-	return '/ws';
+	const url = '/ws';
+	console.log('Using default WebSocket URL (via proxy):', url);
+	console.log('Current location:', window.location.href);
+	return url;
 }
 
 const WS_URL = resolveWsUrl();
-const INITIAL_RECONNECT_DELAY = 3000;
+const INITIAL_RECONNECT_DELAY = 500; // Reduced from 3000ms for faster initial connection
 const MAX_RECONNECT_DELAY = 30000;
+const CONNECTION_TIMEOUT = 5000; // 5 seconds timeout for connection attempt
 
 export function useWebSocket(topics: string[] = ['realtime/*']) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const connectionTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const isConnectingRef = useRef(false);
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY);
   const errorShownRef = useRef(false);
@@ -43,15 +50,31 @@ export function useWebSocket(topics: string[] = ['realtime/*']) {
       isConnectingRef.current = true;
 
       try {
+        console.log('Attempting to connect WebSocket:', WS_URL);
         const ws = new WebSocket(WS_URL);
         wsRef.current = ws;
+
+        // Set connection timeout
+        connectionTimeoutRef.current = setTimeout(() => {
+          if (ws.readyState === WebSocket.CONNECTING) {
+            console.warn('WebSocket connection timeout, closing and retrying...');
+            ws.close();
+          }
+        }, CONNECTION_TIMEOUT);
 
         ws.onopen = () => {
           if (!mounted) {
             ws.close();
             return;
           }
-          console.log('WebSocket connected');
+          
+          // Clear connection timeout on successful connection
+          if (connectionTimeoutRef.current) {
+            clearTimeout(connectionTimeoutRef.current);
+            connectionTimeoutRef.current = undefined;
+          }
+          
+          console.log('WebSocket connected to:', WS_URL);
           errorShownRef.current = false;
           reconnectDelayRef.current = INITIAL_RECONNECT_DELAY;
           isConnectingRef.current = false;
@@ -85,12 +108,31 @@ export function useWebSocket(topics: string[] = ['realtime/*']) {
 
         ws.onclose = (event) => {
           isConnectingRef.current = false;
+          
+          // Clear connection timeout if still active
+          if (connectionTimeoutRef.current) {
+            clearTimeout(connectionTimeoutRef.current);
+            connectionTimeoutRef.current = undefined;
+          }
+          
           if (!mounted) return;
           
           setConnected(false);
           
+          // Log close details for debugging
+          if (!errorShownRef.current) {
+            console.error('WebSocket closed:', {
+              code: event.code,
+              reason: event.reason || 'No reason provided',
+              wasClean: event.wasClean,
+              url: WS_URL,
+            });
+          }
+          
           // Only reconnect if it wasn't a manual close
           if (event.code !== 1000) {
+            // Use shorter delay for first retry, then exponential backoff
+            const delay = reconnectDelayRef.current;
             reconnectTimeoutRef.current = setTimeout(() => {
               if (mounted) {
                 reconnectDelayRef.current = Math.min(
@@ -99,17 +141,29 @@ export function useWebSocket(topics: string[] = ['realtime/*']) {
                 );
                 connect();
               }
-            }, reconnectDelayRef.current);
+            }, delay);
           }
         };
 
-        ws.onerror = () => {
+        ws.onerror = (error) => {
           isConnectingRef.current = false;
+          
+          // Clear connection timeout if still active
+          if (connectionTimeoutRef.current) {
+            clearTimeout(connectionTimeoutRef.current);
+            connectionTimeoutRef.current = undefined;
+          }
+          
           if (!mounted) return;
           
           // Only log error once to avoid spam
           if (!errorShownRef.current) {
-            console.debug('WebSocket connection error (will retry silently)');
+            console.error('WebSocket connection error:', {
+              error,
+              url: WS_URL,
+              currentOrigin: window.location.origin,
+              willRetry: true,
+            });
             errorShownRef.current = true;
           }
           setConnected(false);
@@ -120,7 +174,12 @@ export function useWebSocket(topics: string[] = ['realtime/*']) {
         
         // Only log error once to avoid spam
         if (!errorShownRef.current) {
-          console.debug('Failed to create WebSocket (will retry silently)', error);
+          console.error('Failed to create WebSocket:', {
+            error,
+            url: WS_URL,
+            currentOrigin: window.location.origin,
+            willRetry: true,
+          });
           errorShownRef.current = true;
         }
         setConnected(false);
@@ -146,6 +205,11 @@ export function useWebSocket(topics: string[] = ['realtime/*']) {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
         reconnectTimeoutRef.current = undefined;
+      }
+      
+      if (connectionTimeoutRef.current) {
+        clearTimeout(connectionTimeoutRef.current);
+        connectionTimeoutRef.current = undefined;
       }
       
       if (wsRef.current) {

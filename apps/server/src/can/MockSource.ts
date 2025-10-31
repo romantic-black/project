@@ -181,7 +181,7 @@ export class MockSource implements ICanSource {
   }
 
   async sendFrame(id: number, data: Buffer): Promise<void> {
-    console.log(`MockSource: send frame ${id.toString(16)}`, data.toString('hex'));
+    // Mock source doesn't actually send frames
   }
 
   stats(): SourceStats {
