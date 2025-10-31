@@ -15,6 +15,7 @@ build
 build-*
 *.tsbuildinfo
 apps/web/dist-test
+apps/desktop/renderer
 
 # Environment variables
 .env

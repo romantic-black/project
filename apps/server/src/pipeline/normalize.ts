@@ -76,7 +76,7 @@ export function normalizeFrame(frame: CanFrame): MessageData | null {
 
       // Checksum check
       if (signal.name.includes('CheckSum') && config.CHECKSUM_VALIDATION) {
-        const calculatedXor = frame.data.reduce((xor, byte, idx) => (idx < 7 ? xor ^ byte : xor), 0);
+        const calculatedXor = frame.data.reduce((xor: number, byte: number, idx: number) => (idx < 7 ? xor ^ byte : xor), 0);
         const isValid = checkXorChecksum(frame.data, clampedValue);
         
         logger.logChecksumCheck(frame.id, signal.name, calculatedXor, clampedValue, isValid);
