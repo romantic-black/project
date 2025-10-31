@@ -1,4 +1,5 @@
 import { useTelemetryStore } from '../stores/telemetry';
+import { CanDataCell } from '../components/CanDataCell';
 
 export default function Signals() {
   const { messages } = useTelemetryStore();
@@ -36,12 +37,15 @@ export default function Signals() {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 状态
               </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                CAN数据
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {allSignals.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
                   暂无信号数据
                 </td>
               </tr>
@@ -70,6 +74,9 @@ export default function Signals() {
                     >
                       {sig.healthy ? '正常' : '异常'}
                     </span>
+                  </td>
+                  <td className="px-6 py-4 align-top">
+                    <CanDataCell msgName={sig.msgName} />
                   </td>
                 </tr>
               ))

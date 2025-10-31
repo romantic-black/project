@@ -21,6 +21,10 @@ export class WSServer {
 
   constructor(port: number) {
     this.wss = new WebSocketServer({ port });
+    logger.info('WebSocketServer created', {
+      port,
+      dataMode: config.DATA_MODE,
+    });
     this.updatePerformanceSettings();
     this.setupHandlers();
     this.startHeartbeat();
@@ -44,10 +48,20 @@ export class WSServer {
     this.wss.on('connection', (ws: WsClient) => {
       ws.subscribedTopics = new Set();
       ws.lastPing = Date.now();
+      const clientId = `client-${Date.now()}`;
+      const ip = (ws as any)._socket?.remoteAddress || 'unknown';
+      logger.logWsClientConnect(clientId, ip, {
+        dataMode: config.DATA_MODE,
+      });
+      transportMonitor.recordWsClientConnect(clientId, ip);
 
       ws.on('message', (data: Buffer) => {
         try {
           const msg = JSON.parse(data.toString());
+          logger.debug('WS message received', {
+            clientId,
+            msgType: msg?.type,
+          });
           if (msg.type === 'subscribe') {
             if (Array.isArray(msg.topics)) {
               msg.topics.forEach((topic: string) => {
@@ -55,15 +69,24 @@ export class WSServer {
               });
               // Send buffered messages for subscribed topics
               this.sendBufferedMessages(ws);
+              logger.info('WS subscribe handled', {
+                clientId,
+                topics: msg.topics,
+              });
             }
           } else if (msg.type === 'unsubscribe') {
             if (Array.isArray(msg.topics)) {
               msg.topics.forEach((topic: string) => {
                 ws.subscribedTopics!.delete(topic);
               });
+              logger.info('WS unsubscribe handled', {
+                clientId,
+                topics: msg.topics,
+              });
             }
           } else if (msg.type === 'pong') {
             ws.lastPing = Date.now();
+            logger.debug('WS pong received', { clientId });
           }
         } catch (error) {
           logger.warn('Invalid WebSocket message', { error });
@@ -71,7 +94,6 @@ export class WSServer {
       });
 
       ws.on('close', () => {
-        const clientId = `client-${Date.now()}`;
         logger.logWsClientDisconnect(clientId, 'normal_close');
         transportMonitor.recordWsClientDisconnect(clientId, 'normal_close');
       });
@@ -79,11 +101,6 @@ export class WSServer {
       ws.on('error', (error) => {
         logger.logWsError('connection_error', error);
       });
-
-      const clientId = `client-${Date.now()}`;
-      const ip = (ws as any)._socket?.remoteAddress || 'unknown';
-      logger.logWsClientConnect(clientId, ip);
-      transportMonitor.recordWsClientConnect(clientId, ip);
     });
   }
 
@@ -101,10 +118,12 @@ export class WSServer {
 
         if (ws.readyState === WebSocket.OPEN) {
           client.lastPing = now;
-          ws.send(JSON.stringify({ type: 'ping', timestamp: now }));
+          const pingPayload = { type: 'ping', timestamp: now };
+          ws.send(JSON.stringify(pingPayload));
         }
       });
     }, 10000);
+    logger.info('WebSocket heartbeat started', { intervalMs: 10000 });
   }
 
   private sendBufferedMessages(ws: WebSocket): void {
@@ -113,6 +132,7 @@ export class WSServer {
       return;
     }
 
+    let sentCount = 0;
     for (const [topic, msg] of this.messageBuffer.entries()) {
       const shouldSend = 
         client.subscribedTopics.has(topic) || 
@@ -122,8 +142,10 @@ export class WSServer {
       if (shouldSend) {
         const payload = JSON.stringify({ topic, data: msg });
         ws.send(payload);
+        sentCount++;
       }
     }
+    logger.debug('Buffered messages sent after subscribe', { count: sentCount });
   }
 
   broadcastMessage(msg: MessageData): void {
@@ -177,6 +199,24 @@ export class WSServer {
 
     const duration = Date.now() - sendStartTime;
     logger.logWsSend(topic, payload.length, clientCount, duration);
+    if (errorCount > 0) {
+      logger.error('WS broadcast encountered errors', {
+        topic,
+        clientCount,
+        successCount,
+        errorCount,
+        durationMs: duration,
+        dataMode: config.DATA_MODE,
+      });
+    } else {
+      logger.debug('WS broadcast completed', {
+        topic,
+        clientCount,
+        successCount,
+        durationMs: duration,
+        dataMode: config.DATA_MODE,
+      });
+    }
     transportMonitor.recordWsSend(topic, payload.length, clientCount, duration, errorCount === 0);
   }
 

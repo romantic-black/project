@@ -2,7 +2,17 @@ import { useEffect, useRef } from 'react';
 import { useTelemetryStore } from '../stores/telemetry';
 import type { MessageData } from '@can-telemetry/common';
 
-const WS_URL = import.meta.env.VITE_WS_URL || (import.meta.env.DEV ? '/ws' : 'ws://localhost:8080');
+function resolveWsUrl(): string {
+	const explicitUrl = import.meta.env.VITE_WS_URL;
+	if (explicitUrl && explicitUrl.length > 0) {
+		return explicitUrl;
+	}
+
+	// Default to same-origin relative path; Vite dev server proxies '/ws' → ws backend
+	return '/ws';
+}
+
+const WS_URL = resolveWsUrl();
 const INITIAL_RECONNECT_DELAY = 3000;
 const MAX_RECONNECT_DELAY = 30000;
 

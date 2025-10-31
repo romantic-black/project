@@ -2,10 +2,11 @@ import express from 'express';
 import config from './config.js';
 import { MockSource } from './can/MockSource.js';
 import { ReplaySource } from './can/ReplaySource.js';
-import { SocketCanSource } from './can/SocketCanSource.js';
+import { SocketCanSource, isSocketCanAvailable } from './can/SocketCanSource.js';
 import { VcanSource } from './can/VcanSource.js';
 import type { ICanSource } from './can/ICanSource.js';
 import { normalizeFrame } from './pipeline/normalize.js';
+import dbcLoader from './dbc/loader.js';
 import { dbRepo } from './db/repo.js';
 import { WSServer } from './api/ws.js';
 import { setupRestApi } from './api/rest.js';
@@ -16,17 +17,29 @@ import { performanceManager } from './performance/manager.js';
 const logger = createLogger('main');
 
 let canSource: ICanSource;
+let activeDataMode = config.DATA_MODE;
 
 function createCanSource(): ICanSource {
   switch (config.DATA_MODE) {
     case 'socketcan':
+      if (!isSocketCanAvailable()) {
+        logger.warn(
+          'SocketCAN mode requested but socketcan library is not installed. Falling back to mock mode.'
+        );
+        activeDataMode = 'mock';
+        return new MockSource();
+      }
+      activeDataMode = 'socketcan';
       return new SocketCanSource();
     case 'vcan':
+      activeDataMode = 'vcan';
       return new VcanSource();
     case 'replay':
+      activeDataMode = 'replay';
       return new ReplaySource();
     case 'mock':
     default:
+      activeDataMode = 'mock';
       return new MockSource();
   }
 }
@@ -36,21 +49,39 @@ async function main() {
   const validation = validateConfig();
   if (!validation.valid) {
     logger.error('Configuration validation failed', { errors: validation.errors });
-    process.exit(1);
+    // Avoid forcing process exit to allow logger streams to flush gracefully
+    process.exitCode = 1;
+    return;
   }
   if (validation.warnings.length > 0) {
     logger.warn('Configuration validation warnings', { warnings: validation.warnings });
   }
 
-  logger.info('Starting server', { 
-    dataMode: config.DATA_MODE,
+  try {
+    const dbc = await dbcLoader.load();
+    logger.info('DBC loaded', {
+      messageCount: dbc.messages.length,
+      valTableCount: Object.keys(dbc.valTables || {}).length,
+      path: config.DBC_JSON,
+    });
+  } catch (error) {
+    logger.error('Failed to load DBC definition', {
+      error: error instanceof Error ? error.message : String(error),
+      path: config.DBC_JSON,
+    });
+    process.exitCode = 1;
+    return;
+  }
+
+  canSource = createCanSource();
+  (globalThis as any).canSource = canSource;
+
+  logger.info('Starting server', {
+    dataMode: activeDataMode,
     performanceMode: performanceManager.getMode(),
     wsPort: config.WS_PORT,
     httpPort: config.HTTP_PORT,
   });
-
-  canSource = createCanSource();
-  (globalThis as any).canSource = canSource;
 
   const wss = new WSServer(config.WS_PORT);
   (globalThis as any).wss = wss; // Make accessible to REST API
@@ -71,7 +102,7 @@ async function main() {
   });
 
   await canSource.start();
-  logger.info(`CAN source started in ${config.DATA_MODE} mode`);
+  logger.info(`CAN source started in ${activeDataMode} mode`);
 
   app.listen(config.HTTP_PORT, () => {
     logger.info(`HTTP server listening on port ${config.HTTP_PORT}`);
@@ -83,12 +114,13 @@ async function main() {
     await canSource.stop();
     dbRepo.close();
     wss.close();
-    process.exit(0);
+    // Let the event loop drain for graceful shutdown; do not force exit
+    process.exitCode = 0;
   });
 }
 
 main().catch((error) => {
   logger.error('Fatal error', { error });
-  process.exit(1);
+  // Set exit code; avoid immediate exit to prevent sonic-boom readiness errors
+  process.exitCode = 1;
 });
-

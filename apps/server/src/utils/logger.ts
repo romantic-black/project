@@ -1,16 +1,37 @@
 import pino from 'pino';
-import config from '../config.js';
+import { mkdirSync } from 'fs';
+import { join } from 'path';
+import config, { PROJECT_ROOT } from '../config.js';
 
 // Enhanced logger with structured logging for AI analysis
-const baseLogger = pino({
-  level: config.LOG_LEVEL,
-  formatters: {
-    level: (label) => {
-      return { level: label };
+// Configure dual outputs: console and file (logs/server.log)
+const logsDir = join(PROJECT_ROOT, 'logs');
+try {
+  mkdirSync(logsDir, { recursive: true });
+} catch {
+  // Best-effort creation; failures will still allow console logging
+}
+
+const logFilePath = join(logsDir, 'server.log');
+
+const streams = [
+  { stream: process.stdout },
+  // Use sync: true to avoid sonic-boom readiness issues during fast exits
+  { stream: pino.destination({ dest: logFilePath, mkdir: true, sync: true }) },
+];
+
+const baseLogger = pino(
+  {
+    level: config.LOG_LEVEL,
+    formatters: {
+      level: (label) => {
+        return { level: label };
+      },
     },
+    timestamp: pino.stdTimeFunctions.isoTime,
   },
-  timestamp: pino.stdTimeFunctions.isoTime,
-});
+  pino.multistream(streams)
+);
 
 export interface LogContext {
   [key: string]: any;

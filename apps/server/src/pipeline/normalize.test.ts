@@ -79,3 +79,19 @@ test('IPC_Land_TargetSpd retains high unsigned values without sign extension', a
   assert.ok(result.values['IPC_Land_TargetSpd'] >= 0, 'Decoded value should not be negative');
 });
 
+test('VCU_OdoMeter decodes large 32-bit big-endian counters without overflow', async () => {
+  const context = await getSignalContext('VCU_OdoMeter');
+  const rawValue = 1_234_567_890; // 32-bit value
+  const frame = {
+    id: context.message.id,
+    data: buildFrame(context, rawValue),
+    timestamp: Date.now(),
+  } as const;
+
+  const result = normalizeFrame(frame);
+  assert.ok(result, 'Frame should normalize to a message');
+
+  const expected = applyScale(rawValue, context.signal.factor ?? 1, context.signal.offset ?? 0);
+  assert.equal(result.values['VCU_OdoMeter'], expected);
+});
+

@@ -13,12 +13,21 @@ export function extractBits(
   const endBit = startBit + length - 1;
 
   if (isBigEndian) {
-    for (let bit = startBit; bit <= endBit; bit++) {
-      const byteIndex = Math.floor(bit / 8);
-      const bitIndex = 7 - (bit % 8);
-      if (byteIndex < data.length) {
-        const bitValue = (data[byteIndex] >> bitIndex) & 1;
-        value = (value << 1) | bitValue;
+    // Motorola / big-endian format: bits count down within a byte (MSB→LSB)
+    // and advance to the next higher byte once the byte boundary is crossed.
+    let byteIndex = Math.floor(startBit / 8);
+    let bitIndex = startBit % 8;
+
+    for (let offset = 0; offset < length; offset++) {
+      const bitValue =
+        byteIndex < data.length ? (data[byteIndex] >> bitIndex) & 1 : 0;
+      value = value * 2 + bitValue;
+
+      if (bitIndex === 0) {
+        byteIndex += 1;
+        bitIndex = 7;
+      } else {
+        bitIndex -= 1;
       }
     }
   } else {
@@ -27,7 +36,7 @@ export function extractBits(
       const bitIndex = bit % 8;
       if (byteIndex < data.length) {
         const bitValue = (data[byteIndex] >> bitIndex) & 1;
-        value |= bitValue << (bit - startBit);
+        value += bitValue * Math.pow(2, bit - startBit);
       }
     }
   }
@@ -101,24 +110,28 @@ export function encodeBits(
   const endBit = startBit + length - 1;
 
   if (isBigEndian) {
-    // Big-endian (Motorola): bits are read MSB first
-    // In extractBits: for bit from startBit to endBit, read bitIndex = 7 - (bit % 8)
-    // and build value by left-shifting and OR-ing
-    // So we encode by encoding value's bits from MSB to LSB
-    for (let bit = startBit; bit <= endBit; bit++) {
-      const byteIndex = Math.floor(bit / 8);
-      const bitIndex = 7 - (bit % 8); // Same calculation as extractBits
-      
+    // Big-endian (Motorola): bits are encoded MSB first following the same ordering as extraction
+    let byteIndex = Math.floor(startBit / 8);
+    let bitIndex = startBit % 8;
+
+    for (let offset = 0; offset < length; offset++) {
       if (byteIndex < data.length) {
-        // Calculate which bit of the value corresponds to this position
-        const valueBitIndex = bit - startBit;
-        const bitValue = Math.floor(unsignedValue / Math.pow(2, length - 1 - valueBitIndex)) & 1;
-        
+        const valueBitIndex = length - 1 - offset;
+        const bitValue =
+          Math.floor(unsignedValue / Math.pow(2, valueBitIndex)) & 1;
+
         if (bitValue) {
-          data[byteIndex] |= (1 << bitIndex);
+          data[byteIndex] |= 1 << bitIndex;
         } else {
           data[byteIndex] &= ~(1 << bitIndex);
         }
+      }
+
+      if (bitIndex === 0) {
+        byteIndex += 1;
+        bitIndex = 7;
+      } else {
+        bitIndex -= 1;
       }
     }
   } else {

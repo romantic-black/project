@@ -3,14 +3,20 @@ import type { ICanSource, SourceStats } from './ICanSource.js';
 import config from '../config.js';
 import { CAN_CONFIG } from './config.js';
 import { createLogger } from '../utils/logger.js';
+import { createRequire } from 'module';
 
 const logger = createLogger('socketcan-source');
 
+const require = createRequire(import.meta.url);
 let socketcan: any;
 try {
   socketcan = require('socketcan');
 } catch (error) {
   console.warn('socketcan library not available, SocketCanSource will not work');
+}
+
+export function isSocketCanAvailable(): boolean {
+  return Boolean(socketcan);
 }
 
 export class SocketCanSource implements ICanSource {
@@ -105,4 +111,3 @@ export class SocketCanSource implements ICanSource {
     return { ...this.statsState };
   }
 }
-
