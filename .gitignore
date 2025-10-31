@@ -16,6 +16,7 @@ build-*
 *.tsbuildinfo
 apps/web/dist-test
 apps/desktop/renderer
+apps/desktop/release
 
 # Environment variables
 .env
@@ -173,3 +174,4 @@ Desktop.ini
 .cache
 temp
 tmp
+
