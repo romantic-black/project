@@ -18,7 +18,26 @@ except ImportError:
 
 def parse_dbc(dbc_path: str) -> dict:
     """Parse DBC file and convert to JSON structure."""
-    db = cantools.database.load_file(dbc_path)
+    # Try multiple encodings to handle different DBC file formats
+    # GBK/GB2312 for Chinese DBC files, UTF-8 for international, Latin-1 as fallback
+    encodings = ['gbk', 'gb2312', 'utf-8', 'latin-1']
+    db_content = None
+    used_encoding = None
+    
+    for encoding in encodings:
+        try:
+            with open(dbc_path, 'r', encoding=encoding) as f:
+                db_content = f.read()
+                used_encoding = encoding
+                break
+        except UnicodeDecodeError:
+            continue
+    
+    if db_content is None:
+        raise ValueError(f"Could not decode DBC file {dbc_path} with any of the tried encodings: {encodings}")
+    
+    print(f"Using encoding: {used_encoding}")
+    db = cantools.database.load_string(db_content)
     
     messages = []
     val_tables = {}

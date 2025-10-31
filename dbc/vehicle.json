@@ -16,7 +16,7 @@
           "signed": false,
           "min": -128,
           "max": 127,
-          "comment": "Â½ÉÏ¿ØÖÆÆ÷Ä¿±ê½ÇËÙ¶ÈÇëÇó"
+          "comment": "陆上控制器目标角速度请求"
         },
         {
           "name": "IPC_Land_TargetSpd",
@@ -29,7 +29,7 @@
           "signed": false,
           "min": 0,
           "max": 60,
-          "comment": "Â½ÉÏ¿ØÖÆÆ÷Ä¿±êËÙ¶ÈÇëÇó"
+          "comment": "陆上控制器目标速度请求"
         },
         {
           "name": "IPC_Land_TargetGear",
@@ -42,7 +42,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "Â½ÉÏ¿ØÖÆÆ÷µ²Î»ÇëÇó\n0-Nµ²\n1-Dµ²\n2-Rµ²\n3~15-Ô¤Áô"
+          "comment": "陆上控制器挡位请求\n0-N挡\n1-D挡\n2-R挡\n3~15-预留"
         },
         {
           "name": "IPC_Land_LifeCnt",
@@ -55,7 +55,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "Â½ÉÏ¿ØÖÆÆ÷¼ÆÊýÐÅºÅ"
+          "comment": "陆上控制器计数信号"
         },
         {
           "name": "IPC_Land_TakeOverReq",
@@ -68,7 +68,7 @@
           "signed": false,
           "min": 0,
           "max": 3,
-          "comment": "Â½ÉÏ¿ØÖÆÆ÷½Ó¹ÜÇëÇó\n0-²»½Ó¹Ü\n1-ÇëÇó½Ó¹Ü\n2¡¢3-Ô¤Áô"
+          "comment": "陆上控制器接管请求\n0-不接管\n1-请求接管\n2、3-预留"
         },
         {
           "name": "IPC_Land_EPBReq",
@@ -81,7 +81,7 @@
           "signed": false,
           "min": 0,
           "max": 3,
-          "comment": "Â½ÉÏ¿ØÖÆÆ÷EPBÇëÇó\n0-ÎÞÐ§\n1-À­Æð\n2-ÊÍ·Å\n3-Ô¤Áô"
+          "comment": "陆上控制器EPB请求\n0-无效\n1-拉起\n2-释放\n3-预留"
         },
         {
           "name": "IPC_Land_WorkMode",
@@ -94,7 +94,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "Â½ÉÏ¿ØÖÆÆ÷¹¤×÷Ä£Ê½\n0-Æ½Â·\n1-Ô½Ò°\n2-Ô½ÕÏ\n3-ÅÀÆÂ\n4-Ô½º¾\n5-Â½ÉÏÇÐ»»É³Ì²\n6-É³Ì²ÇÐ»»Â½ÉÏ"
+          "comment": "陆上控制器工作模式\n0-平路\n1-越野\n2-越障\n3-爬坡\n4-越壕\n5-陆上切换沙滩\n6-沙滩切换陆上"
         },
         {
           "name": "IPC_Land_Angle",
@@ -107,7 +107,7 @@
           "signed": false,
           "min": -90,
           "max": 90,
-          "comment": "Â½ÉÏ¿ØÖÆÆ÷·´À¡µ±Ç°½Ç¶ÈÐÅºÅ"
+          "comment": "陆上控制器反馈当前角度信号"
         },
         {
           "name": "IPC_Land_CheckSum",
@@ -120,7 +120,7 @@
           "signed": false,
           "min": 0,
           "max": 255,
-          "comment": "Â½ÉÏ¿ØÖÆÆ÷Ð£Ñé\nByte0 XOR Byte1 XOR Byte2 XOR Byte3 XOR Byte4 XOR Byte5 XOR Byte6 XOR Byte7 "
+          "comment": "陆上控制器校验\nByte0 XOR Byte1 XOR Byte2 XOR Byte3 XOR Byte4 XOR Byte5 XOR Byte6 XOR Byte7 "
         }
       ],
       "sender": "IPC_Land",
@@ -142,7 +142,7 @@
           "signed": false,
           "min": 0,
           "max": 429496729.5,
-          "comment": "VCUÀï³Ì¼ÆÐÅÏ¢"
+          "comment": "VCU里程计信息"
         },
         {
           "name": "VCU_BmsTemp",
@@ -150,12 +150,12 @@
           "length": 8,
           "factor": 1,
           "offset": -50,
-          "unit": "¡æ",
+          "unit": "℃",
           "endianness": "big",
           "signed": false,
           "min": -50,
           "max": 205,
-          "comment": "VCU·´À¡BMSÎÂ¶È"
+          "comment": "VCU反馈BMS温度"
         },
         {
           "name": "VCU_ModeSwitchingFlag",
@@ -168,7 +168,7 @@
           "signed": false,
           "min": 0,
           "max": 1,
-          "comment": "VCU·´À¡Ä£Ê½ÇÐ»»ÖÐFlag\n0-Not Switching\n1-Switching"
+          "comment": "VCU反馈模式切换中Flag\n0-Not Switching\n1-Switching"
         },
         {
           "name": "VCU_ModeSwitchAvailFlag",
@@ -181,7 +181,7 @@
           "signed": false,
           "min": 0,
           "max": 1,
-          "comment": "VCU·´À¡Ä£Ê½¿ÉÇÐ»»Flag\n0-Not Available\n1-Available"
+          "comment": "VCU反馈模式可切换Flag\n0-Not Available\n1-Available"
         },
         {
           "name": "VCU_ErrLevel",
@@ -194,7 +194,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "Õû³µ¹ÊÕÏµÈ¼¶\n0-Normal\n1-Level 1\n2-Level 2\n3-Level 3"
+          "comment": "整车故障等级\n0-Normal\n1-Level 1\n2-Level 2\n3-Level 3"
         },
         {
           "name": "VCU_FeulSts",
@@ -202,12 +202,12 @@
           "length": 8,
           "factor": 0.4,
           "offset": 0,
-          "unit": "£¥",
+          "unit": "％",
           "endianness": "big",
           "signed": false,
           "min": 0,
           "max": 100,
-          "comment": "VCU·´À¡È¼ÁÏÊ£Óà×´Ì¬"
+          "comment": "VCU反馈燃料剩余状态"
         }
       ],
       "sender": "VCU",
@@ -229,7 +229,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "ÂÄ´øÏµÍ³´óÂÖ×´Ì¬\n0-Î´Öª\n1-ÌáÉýËøËÀ\n2-ÂäµØËøËÀ\n3-ÌáÉý¼õÕð\n4-ÂäµØ¼õÕð"
+          "comment": "履带系统大轮状态\n0-未知\n1-提升锁死\n2-落地锁死\n3-提升减震\n4-落地减震"
         },
         {
           "name": "Hyd_SubTrackSts",
@@ -242,7 +242,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "ÂÄ´øÏµÍ³Ð¡ÂÖ×´Ì¬·´À¡\n0-Î´Öª\n1-ÌáÉýËøËÀ\n2-ÂäµØËøËÀ\n3-ÌáÉý¼õÕð\n4-ÂäµØ¼õÕð"
+          "comment": "履带系统小轮状态反馈\n0-未知\n1-提升锁死\n2-落地锁死\n3-提升减震\n4-落地减震"
         },
         {
           "name": "Hyd_LodgingAntennaSts",
@@ -255,7 +255,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "µ¹·üÌìÏß×´Ì¬\n0-ÎÞÐ§\n1-ÏÂ·½µ½Î»\n2-Á¢Æðµ½Î»\n3-Î´Öª×´Ì¬"
+          "comment": "倒伏天线状态\n0-无效\n1-下方到位\n2-立起到位\n3-未知状态"
         },
         {
           "name": "Hyd_ReverseBucketSts",
@@ -268,7 +268,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "µ¹³µ¶·×´Ì¬·´À¡\n0-ÎÞÐ§\n1-»ØÊÕµ½Î»\n2-ÏÂ·Åµ½Î»\n3-Î´Öª×´Ì¬"
+          "comment": "倒车斗状态反馈\n0-无效\n1-回收到位\n2-下放到位\n3-未知状态"
         },
         {
           "name": "Hyd_SternWingSts",
@@ -281,7 +281,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "ôºÒí°å×´Ì¬·´À¡\n0-²»¹¤×÷(ÊÕÂ£×´Ì¬)\n1-¹¤×÷"
+          "comment": "艉翼板状态反馈\n0-不工作(收拢状态)\n1-工作"
         },
         {
           "name": "Hyd_SteerWhlAngle",
@@ -294,7 +294,7 @@
           "signed": false,
           "min": -25,
           "max": 25,
-          "comment": "×ª¶æ·´À¡½Ç¶È"
+          "comment": "转舵反馈角度"
         },
         {
           "name": "Hyd_SprayPumpSts",
@@ -307,7 +307,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "Åç±Ã¹¤×÷×´Ì¬\n0-Î´¹¤×÷\n1-¹¤×÷"
+          "comment": "喷泵工作状态\n0-未工作\n1-工作"
         },
         {
           "name": "Hyd_SealingPlateSts",
@@ -320,7 +320,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "ÂÖÑ¨·â°å×´Ì¬\n0-ÎÞÐ§\n1-ÊÕÂ£×´Ì¬(0¶È)\n2-Õ¹¿ª×´Ì¬(270¶È)"
+          "comment": "轮穴封板状态\n0-无效\n1-收拢状态(0度)\n2-展开状态(270度)"
         }
       ],
       "sender": "VCU",
@@ -337,12 +337,12 @@
           "length": 8,
           "factor": 0.4,
           "offset": 0,
-          "unit": "£¥",
+          "unit": "％",
           "endianness": "big",
           "signed": false,
           "min": 0,
           "max": 100,
-          "comment": "ÓÍÃÅÌ¤°å1¿ª¶È"
+          "comment": "油门踏板1开度"
         },
         {
           "name": "EEC2_EngMaxAvailPcntTrq",
@@ -350,12 +350,12 @@
           "length": 8,
           "factor": 0.4,
           "offset": 0,
-          "unit": "£¥",
+          "unit": "％",
           "endianness": "big",
           "signed": false,
           "min": 0,
           "max": 100,
-          "comment": "Êµ¼Ê×î´ó¿ÉÀûÓÃ·¢¶¯»úÅ¤¾Ø°Ù·Ö±È"
+          "comment": "实际最大可利用发动机扭矩百分比"
         },
         {
           "name": "EEC2_EngPcntLoadatCurSpd",
@@ -363,12 +363,12 @@
           "length": 8,
           "factor": 1,
           "offset": 0,
-          "unit": "£¥",
+          "unit": "％",
           "endianness": "big",
           "signed": false,
           "min": 0,
           "max": 125,
-          "comment": "µ±Ç°×ªËÙ¸ººÉ°Ù·Ö±È"
+          "comment": "当前转速负荷百分比"
         }
       ],
       "sender": "VCU",
@@ -390,7 +390,7 @@
           "signed": false,
           "min": 0,
           "max": 3,
-          "comment": "³µÔØÕï¶Ï¹ÊÕÏÖ¸Ê¾µÆ"
+          "comment": "车载诊断故障指示灯"
         },
         {
           "name": "DLCC1_EngRedStopLamp",
@@ -403,7 +403,7 @@
           "signed": false,
           "min": 0,
           "max": 3,
-          "comment": "·¢¶¯»úºìÉ«Í£³µµÆ"
+          "comment": "发动机红色停车灯"
         },
         {
           "name": "DLCC1_EngAmberWarnLamp",
@@ -416,7 +416,7 @@
           "signed": false,
           "min": 0,
           "max": 3,
-          "comment": "·¢¶¯»úçúçêÉ«¸æ¾¯Ö¸Ê¾µÆ"
+          "comment": "发动机琥珀色告警指示灯"
         },
         {
           "name": "DLCC1_EngCoolantTempHighLamp",
@@ -429,7 +429,7 @@
           "signed": false,
           "min": 0,
           "max": 3,
-          "comment": "·¢¶¯»úÀäÈ´ÒºÎÂ¶È¸ßÖ¸Ê¾µÆ"
+          "comment": "发动机冷却液温度高指示灯"
         },
         {
           "name": "DLCC1_EngOilPresLowLamp",
@@ -442,7 +442,7 @@
           "signed": false,
           "min": 0,
           "max": 3,
-          "comment": "»úÓÍÑ¹Á¦µÍ±¨¾¯µÆ"
+          "comment": "机油压力低报警灯"
         },
         {
           "name": "DLCC1_BrkActiveLamp",
@@ -455,7 +455,7 @@
           "signed": false,
           "min": 0,
           "max": 3,
-          "comment": "ÅÅÆøÖÆ¶¯Ö¸Ê¾µÆ"
+          "comment": "排气制动指示灯"
         },
         {
           "name": "DLCC1_EngCoolantLvlLowLamp",
@@ -468,7 +468,7 @@
           "signed": false,
           "min": 0,
           "max": 3,
-          "comment": "·¢¶¯»úÀäÈ´ÒºÒºÎ»µÍÖ¸Ê¾µÆ"
+          "comment": "发动机冷却液液位低指示灯"
         }
       ],
       "sender": "VCU",
@@ -508,7 +508,7 @@
             "1": "Accelerator pedal selection",
             "0": "Low idle governor/no request"
           },
-          "comment": "·¢¶¯»úÅ¤¾ØÄ£Ê½"
+          "comment": "发动机扭矩模式"
         },
         {
           "name": "EEC1_DemandPcntTrq",
@@ -516,12 +516,12 @@
           "length": 8,
           "factor": 1,
           "offset": -125,
-          "unit": "£¥",
+          "unit": "％",
           "endianness": "big",
           "signed": false,
           "min": -125,
           "max": 125,
-          "comment": "·¢¶¯»úÐèÇóÅ¤¾Ø°Ù·Ö±È"
+          "comment": "发动机需求扭矩百分比"
         },
         {
           "name": "EEC1_ActEngPcntTrq",
@@ -529,12 +529,12 @@
           "length": 8,
           "factor": 1,
           "offset": -125,
-          "unit": "£¥",
+          "unit": "％",
           "endianness": "big",
           "signed": false,
           "min": -125,
           "max": 125,
-          "comment": "·¢¶¯»úÊµ¼ÊÅ¤¾Ø°Ù·Ö±È"
+          "comment": "发动机实际扭矩百分比"
         },
         {
           "name": "EEC1_EngSpeed",
@@ -547,7 +547,7 @@
           "signed": false,
           "min": 0,
           "max": 8031.875,
-          "comment": "·¢¶¯»ú×ªËÙ"
+          "comment": "发动机转速"
         },
         {
           "name": "EEC1_EngStarterMode",
@@ -578,7 +578,7 @@
             "1": "starter active, gear not engaged",
             "0": "start not requested"
           },
-          "comment": "·¢¶¯»úÆð¶¯»úÄ£Ê½"
+          "comment": "发动机起动机模式"
         },
         {
           "name": "EEC1_DriverDemandPcntTrq",
@@ -586,12 +586,12 @@
           "length": 8,
           "factor": 1,
           "offset": -125,
-          "unit": "£¥",
+          "unit": "％",
           "endianness": "big",
           "signed": false,
           "min": -125,
           "max": 125,
-          "comment": "¼ÝÊ»Ô±ÐèÇóÅ¤¾Ø°Ù·Ö±È"
+          "comment": "驾驶员需求扭矩百分比"
         }
       ],
       "sender": "VCU",
@@ -613,7 +613,7 @@
           "signed": false,
           "min": 0,
           "max": 1000,
-          "comment": "ISGµç»úÄ¸ÏßµçÑ¹"
+          "comment": "ISG电机母线电压"
         },
         {
           "name": "ISG_DCcurrent",
@@ -626,7 +626,7 @@
           "signed": false,
           "min": -1000,
           "max": 1000,
-          "comment": "ISGµç»úÊµ¼ÊµçÁ÷"
+          "comment": "ISG电机实际电流"
         }
       ],
       "sender": "VCU",
@@ -648,7 +648,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "VCU·´À¡µ±Ç°¹¤×÷Ä£Ê½\n0-Init Mode\n1-Standby Mode\n2-Manual Land Mode\n3-Manual Sea Mode\n4-Auto Land Mode\n5-Auto Sea Mode\n6-Switching Mode\nF-Emergency Mode"
+          "comment": "VCU反馈当前工作模式\n0-Init Mode\n1-Standby Mode\n2-Manual Land Mode\n3-Manual Sea Mode\n4-Auto Land Mode\n5-Auto Sea Mode\n6-Switching Mode\nF-Emergency Mode"
         },
         {
           "name": "VCU_LifeCnt",
@@ -661,7 +661,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "VCUÉúÃüÐÅºÅ\n0~15Ñ­»·µÝÔö"
+          "comment": "VCU生命信号\n0~15循环递增"
         },
         {
           "name": "VCU_BatSOC",
@@ -669,12 +669,12 @@
           "length": 12,
           "factor": 0.1,
           "offset": 0,
-          "unit": "£¥",
+          "unit": "％",
           "endianness": "big",
           "signed": false,
           "min": 0,
           "max": 100,
-          "comment": "VCU·´À¡µ±Ç°µçÁ¿"
+          "comment": "VCU反馈当前电量"
         },
         {
           "name": "VCU_VehSpeed",
@@ -687,7 +687,7 @@
           "signed": false,
           "min": 0,
           "max": 200,
-          "comment": "VCU·´À¡µ±Ç°³µËÙ"
+          "comment": "VCU反馈当前车速"
         },
         {
           "name": "VCU_IPCseaOnlineSts",
@@ -700,7 +700,7 @@
           "signed": false,
           "min": 0,
           "max": 1,
-          "comment": "VCU·´À¡Ë®ÉÏ¿ØÖÆÆ÷ÔÚÏß±êÖ¾Î»\n0-²»ÔÚÏß\n1-ÔÚÏß"
+          "comment": "VCU反馈水上控制器在线标志位\n0-不在线\n1-在线"
         },
         {
           "name": "VCU_IPClandOnlineSts",
@@ -713,7 +713,7 @@
           "signed": false,
           "min": 0,
           "max": 1,
-          "comment": "VCU·´À¡Â½ÉÏ¿ØÖÆÆ÷ÔÚÏß±êÖ¾Î»\n0-²»ÔÚÏß\n1-ÔÚÏß"
+          "comment": "VCU反馈陆上控制器在线标志位\n0-不在线\n1-在线"
         },
         {
           "name": "VCU_RCOnlineSts",
@@ -726,7 +726,7 @@
           "signed": false,
           "min": 0,
           "max": 1,
-          "comment": "VCU·´À¡Ò£¿ØÆ÷ÔÚÏß±êÖ¾Î»\n0-²»ÔÚÏß\n1-ÔÚÏß"
+          "comment": "VCU反馈遥控器在线标志位\n0-不在线\n1-在线"
         },
         {
           "name": "VCU_ParkingSts",
@@ -739,7 +739,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "VCU·´À¡×¤³µ×´Ì¬"
+          "comment": "VCU反馈驻车状态"
         },
         {
           "name": "VCU_BrkPres",
@@ -752,7 +752,7 @@
           "signed": false,
           "min": 0,
           "max": 10,
-          "comment": "VCU·´À¡µ±Ç°ÖÆ¶¯Ñ¹Á¦"
+          "comment": "VCU反馈当前制动压力"
         },
         {
           "name": "VCU_CurrentGear",
@@ -765,7 +765,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "VCU·´À¡µ±Ç°µ²Î»\n0-Nµ²\n1-Dµ²\n2-Rµ²\n3~15-Ô¤Áô"
+          "comment": "VCU反馈当前挡位\n0-N挡\n1-D挡\n2-R挡\n3~15-预留"
         },
         {
           "name": "VCU_VehAngSpeed",
@@ -778,7 +778,7 @@
           "signed": false,
           "min": -128,
           "max": 127,
-          "comment": "VCU·´À¡µ±Ç°½ÇËÙ¶È"
+          "comment": "VCU反馈当前角速度"
         }
       ],
       "sender": "VCU",
@@ -800,7 +800,7 @@
           "signed": false,
           "min": -3000,
           "max": 3000,
-          "comment": "ISG×î´óÔÊÐíÅ¤¾Ø"
+          "comment": "ISG最大允许扭矩"
         },
         {
           "name": "ISG_ActSpeed",
@@ -813,7 +813,7 @@
           "signed": false,
           "min": -12000,
           "max": 12000,
-          "comment": "ISGµç»úÊµ¼Ê×ªËÙ"
+          "comment": "ISG电机实际转速"
         },
         {
           "name": "ISG_ActTrq",
@@ -826,7 +826,7 @@
           "signed": false,
           "min": -3000,
           "max": 3000,
-          "comment": "ISGµç»úÊµ¼ÊÅ¤¾Ø"
+          "comment": "ISG电机实际扭矩"
         },
         {
           "name": "ISG_ActEnSts",
@@ -839,7 +839,7 @@
           "signed": false,
           "min": 0,
           "max": 1,
-          "comment": "ISGµç»úÊ¹ÄÜ×´Ì¬:\n0-Î´Ê¹ÄÜ,1-Ê¹ÄÜ"
+          "comment": "ISG电机使能状态:\n0-未使能,1-使能"
         },
         {
           "name": "ISG_ActMode",
@@ -852,7 +852,7 @@
           "signed": false,
           "min": 0,
           "max": 31,
-          "comment": "ISGµç»úÊµ¼ÊÄ£Ê½\n0-¹Ø±Õ\n1-Å¤¾ØÄ£Ê½ \n2-×ªËÙÄ£Ê½ \n4-Ö÷¶¯·ÅµçÄ£Ê½"
+          "comment": "ISG电机实际模式\n0-关闭\n1-扭矩模式 \n2-转速模式 \n4-主动放电模式"
         },
         {
           "name": "ISG_FaultLevel",
@@ -865,7 +865,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "ISGµç»ú¹ÊÕÏµÈ¼¶\n0-ÎÞ¹ÊÕÏ\n1-Ò»°ãÑÏÖØ¹ÊÕÏ£¬±¨¾¯\n2-½ÏÑÏÖØ¹ÊÕÏ\n3-ÑÏÖØ¹ÊÕÏ"
+          "comment": "ISG电机故障等级\n0-无故障\n1-一般严重故障，报警\n2-较严重故障\n3-严重故障"
         },
         {
           "name": "ISG_LifeCnt",
@@ -878,7 +878,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "ISGµç»úÐÄÌøÐÅºÅ"
+          "comment": "ISG电机心跳信号"
         }
       ],
       "sender": "VCU",
@@ -900,7 +900,7 @@
           "signed": false,
           "min": -200,
           "max": 200,
-          "comment": "Ë®ÉÏ¿ØÖÆÆ÷Ä¿±ê×ªÏò½Ç¶È"
+          "comment": "水上控制器目标转向角度"
         },
         {
           "name": "IPC_Sea_Target_Throttle",
@@ -908,12 +908,12 @@
           "length": 12,
           "factor": 0.05,
           "offset": 0,
-          "unit": "£¥",
+          "unit": "％",
           "endianness": "big",
           "signed": false,
           "min": 0,
           "max": 100,
-          "comment": "Ë®ÉÏ¿ØÖÆÆ÷Ä¿±êÓÍÃÅ¿ª¶È"
+          "comment": "水上控制器目标油门开度"
         },
         {
           "name": "IPC_Sea_PwrCtrlMode",
@@ -926,7 +926,7 @@
           "signed": false,
           "min": 0,
           "max": 3,
-          "comment": "Ë®ÉÏ¿ØÖÆÆ÷Ä¿±ê¶¯Á¦Ä£Ê½\n0-Ë®ÉÏ¾²Ä¬Ä£Ê½\n1-Ë®ÉÏÑ²º½Ä£Ê½\n2-Ë®ÉÏ¸ßËÙÄ£Ê½\n3-Ô¤Áô"
+          "comment": "水上控制器目标动力模式\n0-水上静默模式\n1-水上巡航模式\n2-水上高速模式\n3-预留"
         },
         {
           "name": "IPC_Sea_TakeOverReq",
@@ -939,7 +939,7 @@
           "signed": false,
           "min": 0,
           "max": 3,
-          "comment": "Ë®ÉÏ¿ØÖÆÆ÷½Ó¹ÜÇëÇó\n0-²»½Ó¹Ü\n1-ÇëÇó½Ó¹Ü\n2¡¢3-Ô¤Áô"
+          "comment": "水上控制器接管请求\n0-不接管\n1-请求接管\n2、3-预留"
         },
         {
           "name": "IPC_Sea_LifeCnt",
@@ -952,7 +952,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "Ë®ÉÏ¿ØÖÆÆ÷ÉúÃüÐÅºÅ\n0~15Ñ­»·µÝÔö"
+          "comment": "水上控制器生命信号\n0~15循环递增"
         },
         {
           "name": "IPC_Sea_ReverseReq",
@@ -965,7 +965,7 @@
           "signed": false,
           "min": 0,
           "max": 3,
-          "comment": "Ë®ÉÏ¿ØÖÆÆ÷µ¹³µ¶·ÏÂ·ÅÇëÇó\n0-ÎÞÐ§\n1-ÇëÇóÏÂ·Å\n2-ÇëÇó»ØÊÕ\n3-Ô¤Áô"
+          "comment": "水上控制器倒车斗下放请求\n0-无效\n1-请求下放\n2-请求回收\n3-预留"
         },
         {
           "name": "IPC_Sea_WorkMode",
@@ -978,7 +978,7 @@
           "signed": false,
           "min": 0,
           "max": 15,
-          "comment": "Ë®ÉÏ¿ØÖÆÆ÷¹¤×÷Ä£Ê½\n0-Ë®ÉÏ\n1-Ë®ÉÏÇÐ»»É³Ì²\n2-É³Ì²ÇÐ»»Ë®ÉÏ"
+          "comment": "水上控制器工作模式\n0-水上\n1-水上切换沙滩\n2-沙滩切换水上"
         },
         {
           "name": "IPC_Sea_CheckSum",
@@ -991,7 +991,7 @@
           "signed": false,
           "min": 0,
           "max": 255,
-          "comment": "Ë®ÉÏ¿ØÖÆÆ÷Ð£Ñé\nByte0 XOR Byte1 XOR Byte2 XOR Byte3 XOR Byte4 XOR Byte5 XOR Byte6 XOR Byte7 "
+          "comment": "水上控制器校验\nByte0 XOR Byte1 XOR Byte2 XOR Byte3 XOR Byte4 XOR Byte5 XOR Byte6 XOR Byte7 "
         }
       ],
       "sender": "IPC_Sea",
