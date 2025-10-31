@@ -41,6 +41,8 @@ data/*.sqlite3
 *.sqlite
 *.sqlite3
 
+dbc/vehicle.json
+
 # Runtime data
 pids
 *.pid
