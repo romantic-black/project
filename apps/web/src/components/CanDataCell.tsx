@@ -102,3 +102,4 @@ export function CanDataCell({ msgName, maxLines = 500, flushIntervalMs = 100 }: 
 
 
 
+
