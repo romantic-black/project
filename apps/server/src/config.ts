@@ -26,6 +26,9 @@ const configSchema = z.object({
   DIAGNOSTICS_ENABLED: z.coerce.boolean().default(true).optional(),
   HEALTH_CHECK_INTERVAL: z.coerce.number().default(30).optional(),
   CHECKSUM_VALIDATION: z.coerce.boolean().default(true).optional(),
+  DB_BATCH_SIZE: z.coerce.number().int().positive().optional(),
+  DB_FLUSH_INTERVAL: z.coerce.number().int().positive().optional(),
+  ENABLE_1S_AGGREGATION: z.coerce.boolean().optional(),
 });
 
 export type Config = z.infer<typeof configSchema>;

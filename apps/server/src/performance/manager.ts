@@ -18,6 +18,7 @@ export interface PerformanceConfig {
   mode: PerformanceMode;
   dbFlushInterval: number; // milliseconds
   enable1sAggregation: boolean;
+  dbBatchSize: number;
   wsBufferMaxSize: number;
   enableRawFrameLog: boolean;
 }
@@ -45,16 +46,18 @@ export class PerformanceManager {
     if (this.currentMode === 'low') {
       return {
         mode: 'low',
-        dbFlushInterval: 15000, // 15 seconds instead of 5
-        enable1sAggregation: false, // Only keep 10s aggregation
+        dbFlushInterval: config.DB_FLUSH_INTERVAL ?? 15000, // 15 seconds instead of 5
+        enable1sAggregation: config.ENABLE_1S_AGGREGATION ?? false, // Only keep 10s aggregation
+        dbBatchSize: config.DB_BATCH_SIZE ?? 200,
         wsBufferMaxSize: 100, // Smaller buffer
         enableRawFrameLog: false, // Disable raw frame logging
       };
     } else {
       return {
         mode: 'normal',
-        dbFlushInterval: 5000, // 5 seconds
-        enable1sAggregation: true,
+        dbFlushInterval: config.DB_FLUSH_INTERVAL ?? 5000, // 5 seconds
+        enable1sAggregation: config.ENABLE_1S_AGGREGATION ?? true,
+        dbBatchSize: config.DB_BATCH_SIZE ?? 100,
         wsBufferMaxSize: 1000,
         enableRawFrameLog: process.env.ENABLE_RAW_FRAME_LOG !== 'false',
       };
@@ -171,4 +174,3 @@ export class PerformanceManager {
 }
 
 export const performanceManager = new PerformanceManager();
-

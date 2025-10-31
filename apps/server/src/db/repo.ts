@@ -7,19 +7,38 @@ import * as schema from './schema.js';
 import { createLogger } from '../utils/logger.js';
 import { transportMonitor } from './transport-monitor.js';
 import { performanceManager } from '../performance/manager.js';
+import type { PerformanceConfig } from '../performance/manager.js';
 
 const logger = createLogger('db-repo');
+
+interface AggregateBucket {
+  firstTimestamp: number;
+  firstValue: number;
+  lastTimestamp: number;
+  lastValue: number;
+  sum: number;
+  min: number;
+  max: number;
+  count: number;
+}
+
+type BucketCollection = Map<string, Map<number, AggregateBucket>>;
+
+interface BucketEntry {
+  signalName: string;
+  bucketTimestamp: number;
+  bucket: AggregateBucket;
+}
 
 export class DbRepo {
   private db: Database.Database;
   private dbPath: string;
   private batchSize = 100;
-  private buffer: Array<{
-    timestamp: number;
-    signalName: string;
-    value: number;
-  }> = [];
+  private pendingCount = 0;
+  private oneSecondBuckets: BucketCollection = new Map();
+  private tenSecondBuckets: BucketCollection = new Map();
   private flushInterval?: NodeJS.Timeout;
+  private flushIntervalMs = 5000;
   private cleanupInterval?: NodeJS.Timeout;
   private isCorrupted = false;
   private enable1sAggregation = true;
@@ -57,15 +76,8 @@ export class DbRepo {
     // Update performance settings
     this.updatePerformanceSettings();
     
-    // Start periodic flush (interval based on performance mode)
-    const flushIntervalMs = performanceManager.getConfig().dbFlushInterval;
-    this.flushInterval = setInterval(() => {
-      if (this.buffer.length > 0) {
-        this.flush();
-      }
-      // Update settings periodically in case mode changed
-      this.updatePerformanceSettings();
-    }, flushIntervalMs);
+    // Start periodic flush loop based on current performance profile
+    this.startFlushTimer();
     
     // Start periodic cleanup (every hour)
     this.cleanupInterval = setInterval(() => {
@@ -266,235 +278,261 @@ export class DbRepo {
   }
 
   batchInsertSignalValue(timestamp: number, signalName: string, value: number): void {
-    this.buffer.push({ timestamp, signalName, value });
+    const tenSecondBucketTs = Math.floor(timestamp / 10000) * 10000;
+    this.updateBucket(this.tenSecondBuckets, signalName, tenSecondBucketTs, timestamp, value);
+    if (this.enable1sAggregation) {
+      const oneSecondBucketTs = Math.floor(timestamp / 1000) * 1000;
+      this.updateBucket(this.oneSecondBuckets, signalName, oneSecondBucketTs, timestamp, value);
+    }
 
-    if (this.buffer.length >= this.batchSize) {
+    this.pendingCount += 1;
+
+    if (this.pendingCount >= this.batchSize) {
       this.flush();
     }
   }
 
-  private updatePerformanceSettings(): void {
-    const perfConfig = performanceManager.getConfig();
-    this.enable1sAggregation = perfConfig.enable1sAggregation;
-    
-    // Update flush interval would require recreating interval, which is handled
-    // by checking in the interval callback
+  private hasPendingBuckets(): boolean {
+    return this.pendingCount > 0;
   }
 
-  private flush(): void {
-    if (this.buffer.length === 0) return;
+  private startFlushTimer(): void {
+    if (this.flushInterval) {
+      clearInterval(this.flushInterval);
+    }
+
+    this.flushInterval = setInterval(() => {
+      if (this.hasPendingBuckets()) {
+        this.flush();
+      }
+      // Refresh performance profile periodically to pick up mode changes
+      this.updatePerformanceSettings();
+    }, this.flushIntervalMs);
+  }
+
+  private updatePerformanceSettings(): void {
+    const perfConfig = performanceManager.getConfig();
+    this.applyPerformanceConfig(perfConfig);
+  }
+
+  private applyPerformanceConfig(perfConfig: PerformanceConfig): void {
+    const nextBatchSize = Math.max(1, perfConfig.dbBatchSize);
+    if (nextBatchSize !== this.batchSize) {
+      this.batchSize = nextBatchSize;
+    }
+
+    const previousEnable1s = this.enable1sAggregation;
+    this.enable1sAggregation = perfConfig.enable1sAggregation;
+    if (!this.enable1sAggregation && previousEnable1s) {
+      this.oneSecondBuckets.clear();
+    }
+
+    const nextFlushInterval = Math.max(100, perfConfig.dbFlushInterval);
+    if (nextFlushInterval !== this.flushIntervalMs) {
+      this.flushIntervalMs = nextFlushInterval;
+      this.startFlushTimer();
+    }
+
+    if (this.pendingCount >= this.batchSize) {
+      this.flush();
+    }
+  }
+
+  private flush(force: boolean = false): void {
+    if (!force && !this.hasPendingBuckets()) return;
     if (this.isCorrupted) {
       logger.warn('Skipping flush due to database corruption');
-      this.buffer = [];
       return;
     }
 
     const flushStartTime = Date.now();
-    const bufferSize = this.buffer.length;
-    let successCount = 0;
+    const now = flushStartTime;
+    const bufferSize = this.pendingCount;
+
+    const readyTenSecondBuckets = this.collectReadyBuckets(this.tenSecondBuckets, 10000, now, force);
+    const readyOneSecondBuckets =
+      this.enable1sAggregation && this.oneSecondBuckets.size > 0
+        ? this.collectReadyBuckets(this.oneSecondBuckets, 1000, now, force)
+        : [];
+
+    if (!force && readyTenSecondBuckets.length === 0 && readyOneSecondBuckets.length === 0) {
+      return;
+    }
+
+    let successCount = readyTenSecondBuckets.reduce((acc, entry) => acc + entry.bucket.count, 0);
     let errorCount = 0;
-
-    const now = Date.now();
-    const oneSecondAgo = now - 1000;
-    const tenSecondsAgo = now - 10000;
-
-    const grouped = new Map<string, Array<{ timestamp: number; value: number }>>();
-
-    for (const item of this.buffer) {
-      if (!grouped.has(item.signalName)) {
-        grouped.set(item.signalName, []);
-      }
-      grouped.get(item.signalName)!.push({ timestamp: item.timestamp, value: item.value });
-    }
-
-    // Group by time windows to avoid duplicate inserts
-    const oneSecondBuckets = new Map<string, Array<{ timestamp: number; value: number }>>();
-    const tenSecondBuckets = new Map<string, Array<{ timestamp: number; value: number }>>();
-
-    for (const [signalName, values] of grouped.entries()) {
-      if (values.length === 0) continue;
-
-      const oneSecondWindow = values.filter((v) => v.timestamp >= oneSecondAgo);
-      if (oneSecondWindow.length > 0) {
-        const bucketKey = `${Math.floor(oneSecondAgo / 1000) * 1000}_${signalName}`;
-        if (!oneSecondBuckets.has(bucketKey)) {
-          oneSecondBuckets.set(bucketKey, []);
-        }
-        oneSecondBuckets.get(bucketKey)!.push(...oneSecondWindow);
-      }
-
-      const tenSecondWindow = values.filter((v) => v.timestamp >= tenSecondsAgo);
-      if (tenSecondWindow.length > 0) {
-        const bucketKey = `${Math.floor(tenSecondsAgo / 10000) * 10000}_${signalName}`;
-        if (!tenSecondBuckets.has(bucketKey)) {
-          tenSecondBuckets.set(bucketKey, []);
-        }
-        tenSecondBuckets.get(bucketKey)!.push(...tenSecondWindow);
-      }
-    }
 
     try {
       const transaction = this.db.transaction(() => {
-        // Process 1s aggregates (only if enabled)
-        if (this.enable1sAggregation) {
-          for (const [bucketKey, windowValues] of oneSecondBuckets.entries()) {
-            if (windowValues.length === 0) continue;
-            
-            const [timestampStr, signalName] = bucketKey.split('_');
-            const timestamp = parseInt(timestampStr, 10);
-            
-            // Sort by timestamp to get correct first/last
-            windowValues.sort((a, b) => a.timestamp - b.timestamp);
-            
-            const last1s = windowValues[windowValues.length - 1];
-            const first1s = windowValues[0];
-            const sum1s = windowValues.reduce((acc, v) => acc + v.value, 0);
-            const avg1s = sum1s / windowValues.length;
-            const max1s = Math.max(...windowValues.map((v) => v.value));
-            const min1s = Math.min(...windowValues.map((v) => v.value));
-
+        if (this.enable1sAggregation && readyOneSecondBuckets.length > 0) {
+          for (const entry of readyOneSecondBuckets) {
+            const avg = entry.bucket.sum / entry.bucket.count;
             this.insert1sStmt!.run(
-              timestamp,
-              signalName,
-              last1s.value,
-              first1s.value,
-              avg1s,
-              max1s,
-              min1s
+              entry.bucketTimestamp,
+              entry.signalName,
+              entry.bucket.lastValue,
+              entry.bucket.firstValue,
+              avg,
+              entry.bucket.max,
+              entry.bucket.min
             );
-            successCount += windowValues.length;
           }
         }
 
-        // Process 10s aggregates (always enabled)
-        for (const [bucketKey, windowValues] of tenSecondBuckets.entries()) {
-          if (windowValues.length === 0) continue;
-          
-          const [timestampStr, signalName] = bucketKey.split('_');
-          const timestamp = parseInt(timestampStr, 10);
-          
-          // Sort by timestamp to get correct first/last
-          windowValues.sort((a, b) => a.timestamp - b.timestamp);
-          
-          const last10s = windowValues[windowValues.length - 1];
-          const first10s = windowValues[0];
-          const sum10s = windowValues.reduce((acc, v) => acc + v.value, 0);
-          const avg10s = sum10s / windowValues.length;
-          const max10s = Math.max(...windowValues.map((v) => v.value));
-          const min10s = Math.min(...windowValues.map((v) => v.value));
-
+        for (const entry of readyTenSecondBuckets) {
+          const avg = entry.bucket.sum / entry.bucket.count;
           this.insert10sStmt!.run(
-            timestamp,
-            signalName,
-            last10s.value,
-            first10s.value,
-            avg10s,
-            max10s,
-            min10s
+            entry.bucketTimestamp,
+            entry.signalName,
+            entry.bucket.lastValue,
+            entry.bucket.firstValue,
+            avg,
+            entry.bucket.max,
+            entry.bucket.min
           );
-          successCount += windowValues.length;
         }
       });
 
       transaction();
       const duration = Date.now() - flushStartTime;
-      
-      // Record successful operation
+
+      const removedFromTenSecond = this.removeBuckets(this.tenSecondBuckets, readyTenSecondBuckets, true);
+      if (removedFromTenSecond > 0) {
+        this.pendingCount = Math.max(0, this.pendingCount - removedFromTenSecond);
+      }
+      if (this.enable1sAggregation && readyOneSecondBuckets.length > 0) {
+        this.removeBuckets(this.oneSecondBuckets, readyOneSecondBuckets);
+      }
+
       transportMonitor.recordDbFlush(bufferSize, successCount, errorCount, duration);
       if (this.enable1sAggregation) {
-        transportMonitor.recordDbOperation('insert', 'signals_agg_1s', true, oneSecondBuckets.size, duration);
+        transportMonitor.recordDbOperation(
+          'insert',
+          'signals_agg_1s',
+          true,
+          readyOneSecondBuckets.length,
+          duration
+        );
       }
-      transportMonitor.recordDbOperation('insert', 'signals_agg_10s', true, tenSecondBuckets.size, duration);
-      
+      transportMonitor.recordDbOperation(
+        'insert',
+        'signals_agg_10s',
+        true,
+        readyTenSecondBuckets.length,
+        duration
+      );
+
       logger.logDbFlush(bufferSize, successCount, errorCount, duration);
-      this.buffer = [];
     } catch (error: any) {
-      errorCount = bufferSize;
+      errorCount = successCount;
       const duration = Date.now() - flushStartTime;
-      
-      // Record failed operation
+
       transportMonitor.recordDbFlush(bufferSize, 0, errorCount, duration);
-      if (this.enable1sAggregation) {
-        transportMonitor.recordDbOperation('insert', 'signals_agg_1s', false, 0, duration, error);
+      if (this.enable1sAggregation && readyOneSecondBuckets.length > 0) {
+        transportMonitor.recordDbOperation(
+          'insert',
+          'signals_agg_1s',
+          false,
+          readyOneSecondBuckets.length,
+          duration,
+          error
+        );
       }
-      transportMonitor.recordDbOperation('insert', 'signals_agg_10s', false, 0, duration, error);
-      
+      transportMonitor.recordDbOperation(
+        'insert',
+        'signals_agg_10s',
+        false,
+        readyTenSecondBuckets.length,
+        duration,
+        error
+      );
+
       this.handleCorruption(error);
-      // Retry flush after recovery (but only once to avoid infinite loop)
-      if (!this.isCorrupted && this.buffer.length > 0) {
-        try {
-          const retryStartTime = Date.now();
-          const transaction = this.db.transaction(() => {
-            // Process 1s aggregates (only if enabled)
-            if (this.enable1sAggregation) {
-              for (const [bucketKey, windowValues] of oneSecondBuckets.entries()) {
-                if (windowValues.length === 0) continue;
-                
-                const [timestampStr, signalName] = bucketKey.split('_');
-                const timestamp = parseInt(timestampStr, 10);
-                
-                windowValues.sort((a, b) => a.timestamp - b.timestamp);
-                
-                const last1s = windowValues[windowValues.length - 1];
-                const first1s = windowValues[0];
-                const sum1s = windowValues.reduce((acc, v) => acc + v.value, 0);
-                const avg1s = sum1s / windowValues.length;
-                const max1s = Math.max(...windowValues.map((v) => v.value));
-                const min1s = Math.min(...windowValues.map((v) => v.value));
+    }
+  }
 
-                this.insert1sStmt!.run(
-                  timestamp,
-                  signalName,
-                  last1s.value,
-                  first1s.value,
-                  avg1s,
-                  max1s,
-                  min1s
-                );
-              }
-            }
-
-            // Process 10s aggregates
-            for (const [bucketKey, windowValues] of tenSecondBuckets.entries()) {
-              if (windowValues.length === 0) continue;
-              
-              const [timestampStr, signalName] = bucketKey.split('_');
-              const timestamp = parseInt(timestampStr, 10);
-              
-              windowValues.sort((a, b) => a.timestamp - b.timestamp);
-              
-              const last10s = windowValues[windowValues.length - 1];
-              const first10s = windowValues[0];
-              const sum10s = windowValues.reduce((acc, v) => acc + v.value, 0);
-              const avg10s = sum10s / windowValues.length;
-              const max10s = Math.max(...windowValues.map((v) => v.value));
-              const min10s = Math.min(...windowValues.map((v) => v.value));
-
-              this.insert10sStmt!.run(
-                timestamp,
-                signalName,
-                last10s.value,
-                first10s.value,
-                avg10s,
-                max10s,
-                min10s
-              );
-            }
-          });
-
-          transaction();
-          const retryDuration = Date.now() - retryStartTime;
-          transportMonitor.recordDbFlush(bufferSize, bufferSize, 0, retryDuration);
-          this.buffer = [];
-        } catch (retryError) {
-          logger.logDbError('flush_retry', 'signals_agg', retryError as Error, {
-            errorCode: 'DB_FLUSH_RETRY_FAILED',
-          });
-          this.buffer = [];
+  private collectReadyBuckets(
+    collection: BucketCollection,
+    windowSizeMs: number,
+    now: number,
+    force: boolean
+  ): BucketEntry[] {
+    const ready: BucketEntry[] = [];
+    for (const [signalName, buckets] of collection.entries()) {
+      for (const [bucketTimestamp, bucket] of buckets.entries()) {
+        if (force || bucketTimestamp + windowSizeMs <= now) {
+          ready.push({ signalName, bucketTimestamp, bucket });
         }
-      } else {
-        this.buffer = [];
       }
+    }
+    return ready;
+  }
+
+  private removeBuckets(
+    collection: BucketCollection,
+    entries: BucketEntry[],
+    trackSamples: boolean = false
+  ): number {
+    let removedSamples = 0;
+    for (const entry of entries) {
+      const signalBuckets = collection.get(entry.signalName);
+      if (!signalBuckets) continue;
+
+      signalBuckets.delete(entry.bucketTimestamp);
+      if (signalBuckets.size === 0) {
+        collection.delete(entry.signalName);
+      }
+
+      if (trackSamples) {
+        removedSamples += entry.bucket.count;
+      }
+    }
+    return removedSamples;
+  }
+
+  private updateBucket(
+    collection: BucketCollection,
+    signalName: string,
+    bucketTimestamp: number,
+    timestamp: number,
+    value: number
+  ): void {
+    let signalBuckets = collection.get(signalName);
+    if (!signalBuckets) {
+      signalBuckets = new Map();
+      collection.set(signalName, signalBuckets);
+    }
+
+    const bucket = signalBuckets.get(bucketTimestamp);
+    if (!bucket) {
+      signalBuckets.set(bucketTimestamp, {
+        firstTimestamp: timestamp,
+        firstValue: value,
+        lastTimestamp: timestamp,
+        lastValue: value,
+        sum: value,
+        min: value,
+        max: value,
+        count: 1,
+      });
+      return;
+    }
+
+    if (timestamp < bucket.firstTimestamp) {
+      bucket.firstTimestamp = timestamp;
+      bucket.firstValue = value;
+    }
+    if (timestamp >= bucket.lastTimestamp) {
+      bucket.lastTimestamp = timestamp;
+      bucket.lastValue = value;
+    }
+    bucket.sum += value;
+    bucket.count += 1;
+    if (value > bucket.max) {
+      bucket.max = value;
+    }
+    if (value < bucket.min) {
+      bucket.min = value;
     }
   }
 
@@ -603,7 +641,7 @@ export class DbRepo {
     }
     if (!this.isCorrupted) {
       try {
-        this.flush();
+        this.flush(true);
       } catch (error) {
         logger.error('Error during final flush', { error });
       }
