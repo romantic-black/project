@@ -2,19 +2,41 @@ import { useEffect, useRef } from 'react';
 import { useTelemetryStore } from '../stores/telemetry';
 import type { MessageData } from '@can-telemetry/common';
 
-function resolveWsUrl(): string {
-	const explicitUrl = import.meta.env.VITE_WS_URL;
-	if (explicitUrl && explicitUrl.length > 0) {
-		console.log('Using VITE_WS_URL:', explicitUrl);
-		console.log('Current location:', window.location.href);
-		return explicitUrl;
-	}
+declare global {
+  interface Window {
+    desktop?: {
+      platform?: string;
+      versions?: Record<string, string>;
+      config?: {
+        wsUrl?: string;
+      };
+    };
+  }
+}
 
-	// Default to same-origin relative path; Vite dev server proxies '/ws' → ws backend
-	const url = '/ws';
-	console.log('Using default WebSocket URL (via proxy):', url);
-	console.log('Current location:', window.location.href);
-	return url;
+function resolveWsUrl(): string {
+  const runtimeDesktopUrl = typeof window !== 'undefined'
+    ? window.desktop?.config?.wsUrl?.trim()
+    : undefined;
+
+  if (runtimeDesktopUrl) {
+    console.log('Using runtime desktop config WS URL:', runtimeDesktopUrl);
+    console.log('Current location:', typeof window !== 'undefined' ? window.location.href : 'unknown (no window)');
+    return runtimeDesktopUrl;
+  }
+
+  const explicitUrl = import.meta.env.VITE_WS_URL;
+  if (explicitUrl && explicitUrl.length > 0) {
+    console.log('Using VITE_WS_URL:', explicitUrl);
+    console.log('Current location:', window.location.href);
+    return explicitUrl;
+  }
+
+  // Default to same-origin relative path; Vite dev server proxies '/ws' → ws backend
+  const url = '/ws';
+  console.log('Using default WebSocket URL (via proxy):', url);
+  console.log('Current location:', window.location.href);
+  return url;
 }
 
 const WS_URL = resolveWsUrl();

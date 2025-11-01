@@ -30,7 +30,12 @@ async function prepareRenderer() {
   const webDistDir = path.join(webDir, 'dist');
 
   console.log('> Building renderer assets (apps/web)');
-  await run('pnpm', ['--dir', webDir, 'build']);
+  await run('pnpm', ['--dir', webDir, 'build'], {
+    env: {
+      ...process.env,
+      VITE_DESKTOP_APP: '1',
+    },
+  });
 
   if (fs.existsSync(rendererDir)) {
     console.log('> Removing previous renderer build');

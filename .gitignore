@@ -17,6 +17,7 @@ build-*
 apps/web/dist-test
 apps/desktop/renderer
 apps/desktop/release
+apps/desktop/config.json
 
 # Environment variables
 .env
