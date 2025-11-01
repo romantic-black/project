@@ -43,7 +43,7 @@ data/*.sqlite3
 *.sqlite
 *.sqlite3
 
-dbc/vehicle.json
+dbc/
 
 # Runtime data
 pids

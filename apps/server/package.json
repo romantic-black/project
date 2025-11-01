@@ -18,9 +18,11 @@
     "express": "^4.18.2",
     "pino": "^8.17.2",
     "pino-pretty": "^10.3.1",
-    "socketcan": "^4.0.7",
     "ws": "^8.16.0",
     "zod": "^3.22.4"
+  },
+  "optionalDependencies": {
+    "socketcan": "^4.0.7"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.8",
