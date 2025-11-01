@@ -11,52 +11,86 @@ import type { PerformanceConfig } from '../performance/manager.js';
 
 const logger = createLogger('db-repo');
 
+/**
+ * 聚合桶数据结构 - 用于在内存中累积时间窗口内的统计数据
+ * 
+ * 设计目的：延迟批量写入，减少数据库操作次数，提高性能
+ */
 interface AggregateBucket {
-  firstTimestamp: number;
-  firstValue: number;
-  lastTimestamp: number;
-  lastValue: number;
-  sum: number;
-  min: number;
-  max: number;
-  count: number;
+  firstTimestamp: number; // 时间窗口内第一个样本的时间戳
+  firstValue: number; // 时间窗口内第一个样本的值
+  lastTimestamp: number; // 时间窗口内最后一个样本的时间戳
+  lastValue: number; // 时间窗口内最后一个样本的值（用于实时显示）
+  sum: number; // 所有样本值的累加和
+  min: number; // 窗口内的最小值
+  max: number; // 窗口内的最大值
+  count: number; // 窗口内的样本数量
 }
 
+/**
+ * 桶集合类型定义
+ * 结构: Map<信号名, Map<时间桶时间戳, 聚合桶>>
+ * 
+ * 示例:
+ * {
+ *   "VCU_VehSpeed": {
+ *     12000: { min: 45.0, max: 46.5, avg: 45.8, count: 10 },
+ *     13000: { min: 46.0, max: 47.2, avg: 46.5, count: 10 }
+ *   },
+ *   "VCU_BatSOC": {
+ *     12000: { min: 84.5, max: 85.2, avg: 85.0, count: 10 }
+ *   }
+ * }
+ */
 type BucketCollection = Map<string, Map<number, AggregateBucket>>;
 
+/**
+ * 桶条目 - 用于批量写入数据库时传递数据
+ */
 interface BucketEntry {
-  signalName: string;
-  bucketTimestamp: number;
-  bucket: AggregateBucket;
+  signalName: string; // 信号名称
+  bucketTimestamp: number; // 时间桶时间戳（对齐后的时间）
+  bucket: AggregateBucket; // 聚合数据
 }
 
+/**
+ * 数据库仓库类 - 负责数据存储、聚合和查询
+ * 
+ * 核心功能:
+ * 1. 接收信号值并聚合到时间桶中
+ * 2. 批量刷新聚合数据到数据库
+ * 3. 提供历史数据查询和快照查询
+ * 4. 自动清理过期数据
+ * 5. 处理数据库损坏和恢复
+ */
 export class DbRepo {
-  private db: Database.Database;
-  private dbPath: string;
-  private batchSize = 100;
-  private pendingCount = 0;
-  private oneSecondBuckets: BucketCollection = new Map();
-  private tenSecondBuckets: BucketCollection = new Map();
-  private flushInterval?: NodeJS.Timeout;
-  private flushIntervalMs = 5000;
-  private cleanupInterval?: NodeJS.Timeout;
-  private isCorrupted = false;
-  private enable1sAggregation = true;
+  private db: Database.Database; // SQLite 数据库实例
+  private dbPath: string; // 数据库文件路径
+  private batchSize = 100; // 批量写入的样本数量阈值
+  private pendingCount = 0; // 当前累积的待写入样本数
+  private oneSecondBuckets: BucketCollection = new Map(); // 1秒时间桶集合
+  private tenSecondBuckets: BucketCollection = new Map(); // 10秒时间桶集合
+  private flushInterval?: NodeJS.Timeout; // 定时刷新定时器
+  private flushIntervalMs = 5000; // 刷新间隔（毫秒）
+  private cleanupInterval?: NodeJS.Timeout; // 定时清理定时器
+  private isCorrupted = false; // 数据库是否已损坏
+  private enable1sAggregation = true; // 是否启用1秒聚合（低性能模式下可禁用）
   
-  // Cached prepared statements
-  private insert1sStmt?: Database.Statement;
-  private insert10sStmt?: Database.Statement;
-  private cleanupFramesStmt?: Database.Statement;
-  private cleanup1sStmt?: Database.Statement;
-  private cleanup10sStmt?: Database.Statement;
-  private cleanupAlarmStmt?: Database.Statement;
+  // Cached prepared statements - 预编译的SQL语句，提高性能
+  private insert1sStmt?: Database.Statement; // 插入1秒聚合数据的预编译语句
+  private insert10sStmt?: Database.Statement; // 插入10秒聚合数据的预编译语句
+  private cleanupFramesStmt?: Database.Statement; // 清理原始帧的预编译语句
+  private cleanup1sStmt?: Database.Statement; // 清理1秒聚合数据的预编译语句
+  private cleanup10sStmt?: Database.Statement; // 清理10秒聚合数据的预编译语句
+  private cleanupAlarmStmt?: Database.Statement; // 清理告警事件的预编译语句
 
   constructor() {
+    // 确定数据库文件路径（支持绝对路径和相对路径）
     this.dbPath = config.DB_PATH.startsWith('/')
       ? config.DB_PATH
       : join(PROJECT_ROOT, config.DB_PATH);
     
-    // Ensure database directory exists
+    // 确保数据库目录存在
     const dbDir = dirname(this.dbPath);
     try {
       mkdirSync(dbDir, { recursive: true });
@@ -65,26 +99,36 @@ export class DbRepo {
     }
     
     this.db = this.openDatabase();
-    this.verifyIntegrity();
+    this.verifyIntegrity(); // 启动时检查数据库完整性
     
-    // Initialize database tables
+    // Initialize database tables - 创建表和索引
     this.initializeTables();
     
-    // Initialize prepared statements
+    // Initialize prepared statements - 预编译SQL以提高性能
     this.initializeStatements();
     
-    // Update performance settings
+    // Update performance settings - 根据性能模式配置参数
     this.updatePerformanceSettings();
     
     // Start periodic flush loop based on current performance profile
+    // 启动定时刷新循环（默认5秒或按配置）
     this.startFlushTimer();
     
     // Start periodic cleanup (every hour)
+    // 启动定时清理任务（每小时清理7天前的数据）
     this.cleanupInterval = setInterval(() => {
       this.cleanupTTL(7);
     }, 3600000);
   }
 
+  /**
+   * 打开数据库并配置性能参数
+   * 
+   * 关键配置说明:
+   * - journal_mode = WAL: 使用Write-Ahead Logging模式，提高并发写入性能
+   * - synchronous = NORMAL: 平衡数据安全性和性能（相比FULL模式更快）
+   * - cache_size = -64000: 设置64MB内存缓存（负值单位是KB）
+   */
   private openDatabase(): Database.Database {
     const db = new Database(this.dbPath);
     db.pragma('journal_mode = WAL');
@@ -93,6 +137,12 @@ export class DbRepo {
     return db;
   }
 
+  /**
+   * 验证数据库完整性
+   * 
+   * 在启动时检查数据库文件是否损坏
+   * 如果损坏则自动触发恢复流程
+   */
   private verifyIntegrity(): void {
     try {
       const result = this.db.prepare('PRAGMA integrity_check').get() as { integrity_check: string };
@@ -110,6 +160,20 @@ export class DbRepo {
     }
   }
 
+  /**
+   * 恢复损坏的数据库
+   * 
+   * 恢复策略：删除损坏文件并重建新数据库
+   * - 优点：快速恢复，不影响服务可用性
+   * - 缺点：历史数据丢失（但对实时监控系统可接受）
+   * 
+   * 步骤:
+   * 1. 关闭现有连接
+   * 2. 备份损坏文件（用于后续分析）
+   * 3. 清理WAL/SHM文件
+   * 4. 创建新数据库
+   * 5. 重新初始化表和语句
+   */
   private recoverDatabase(): void {
     logger.warn('Attempting to recover corrupted database...');
     
@@ -123,7 +187,7 @@ export class DbRepo {
         }
       }
 
-      // Backup corrupted database
+      // Backup corrupted database - 备份损坏文件用于分析
       if (existsSync(this.dbPath)) {
         const backupPath = `${this.dbPath}.corrupted.${Date.now()}`;
         try {
@@ -135,6 +199,7 @@ export class DbRepo {
       }
 
       // Clean up WAL and SHM files if they exist
+      // WAL = Write-Ahead Log, SHM = Shared Memory
       const walPath = `${this.dbPath}-wal`;
       const shmPath = `${this.dbPath}-shm`;
       try {
@@ -144,7 +209,7 @@ export class DbRepo {
         // Ignore errors when removing WAL/SHM files
       }
 
-      // Open new database
+      // Open new database - 重建干净数据库
       this.db = this.openDatabase();
       this.initializeTables();
       this.initializeStatements();
@@ -277,9 +342,28 @@ export class DbRepo {
     this.cleanupAlarmStmt = this.db.prepare('DELETE FROM events_alarm WHERE timestamp < ?');
   }
 
+  /**
+   * 批量插入信号值 - 核心API方法
+   * 
+   * 功能: 接收解码后的信号值，聚合到内存时间桶中
+   * 
+   * 流程:
+   * 1. 计算10秒时间桶时间戳 (对齐到10秒边界)
+   * 2. 更新10秒桶的统计值 (min/max/avg/sum/count)
+   * 3. 如果启用，同时更新1秒桶
+   * 4. 递增待写入计数器
+   * 5. 达到批量阈值时触发刷新
+   * 
+   * @param timestamp 信号时间戳（毫秒）
+   * @param signalName 信号名称
+   * @param value 信号值
+   */
   batchInsertSignalValue(timestamp: number, signalName: string, value: number): void {
+    // 计算10秒对齐的时间戳: 12345ms -> 10000ms, 123456ms -> 120000ms
     const tenSecondBucketTs = Math.floor(timestamp / 10000) * 10000;
     this.updateBucket(this.tenSecondBuckets, signalName, tenSecondBucketTs, timestamp, value);
+    
+    // 如果启用1秒聚合，同时更新1秒桶
     if (this.enable1sAggregation) {
       const oneSecondBucketTs = Math.floor(timestamp / 1000) * 1000;
       this.updateBucket(this.oneSecondBuckets, signalName, oneSecondBucketTs, timestamp, value);
@@ -287,6 +371,7 @@ export class DbRepo {
 
     this.pendingCount += 1;
 
+    // 达到批量阈值时立即触发刷新
     if (this.pendingCount >= this.batchSize) {
       this.flush();
     }
@@ -338,7 +423,26 @@ export class DbRepo {
     }
   }
 
+  /**
+   * 刷新数据到数据库 - 核心写入逻辑
+   * 
+   * 功能: 将内存中聚合好的时间桶批量写入数据库
+   * 
+   * 刷新条件:
+   * 1. force=true: 强制刷新所有桶（如关闭时）
+   * 2. 时间窗口已过期: 桶的时间戳 + 窗口大小 <= 当前时间
+   * 3. 达到批量阈值: pendingCount >= batchSize
+   * 
+   * 写入策略:
+   * - 使用事务确保原子性
+   * - 使用PreparedStatement提高性能
+   * - 计算avg = sum / count
+   * - 批量插入后再清理内存桶
+   * 
+   * @param force 是否强制刷新所有桶（默认false，只刷新已过期的桶）
+   */
   private flush(force: boolean = false): void {
+    // 无待写入数据则跳过（除非强制）
     if (!force && !this.hasPendingBuckets()) return;
     if (this.isCorrupted) {
       logger.warn('Skipping flush due to database corruption');
@@ -349,16 +453,19 @@ export class DbRepo {
     const now = flushStartTime;
     const bufferSize = this.pendingCount;
 
+    // 收集可以写入的桶（时间窗口已过期或强制刷新）
     const readyTenSecondBuckets = this.collectReadyBuckets(this.tenSecondBuckets, 10000, now, force);
     const readyOneSecondBuckets =
       this.enable1sAggregation && this.oneSecondBuckets.size > 0
         ? this.collectReadyBuckets(this.oneSecondBuckets, 1000, now, force)
         : [];
 
+    // 没有ready的桶则跳过（除非强制）
     if (!force && readyTenSecondBuckets.length === 0 && readyOneSecondBuckets.length === 0) {
       return;
     }
 
+    // 统计样本数量用于监控
     let successCount = readyTenSecondBuckets.reduce((acc, entry) => acc + entry.bucket.count, 0);
     let errorCount = 0;
 
@@ -490,6 +597,26 @@ export class DbRepo {
     return removedSamples;
   }
 
+  /**
+   * 更新时间桶的统计数据
+   * 
+   * 功能: 将新的信号值聚合到指定的时间桶中
+   * 
+   * 聚合逻辑:
+   * - 如果桶不存在: 创建新桶，初始化为当前值
+   * - 如果桶存在: 更新统计值
+   *   - min: 取最小值
+   *   - max: 取最大值
+   *   - sum: 累加所有值（用于计算avg）
+   *   - count: 递增计数
+   *   - first/last: 记录时间窗口的首尾值和时间戳
+   * 
+   * @param collection 桶集合（1秒或10秒）
+   * @param signalName 信号名称
+   * @param bucketTimestamp 时间桶时间戳（对齐后的）
+   * @param timestamp 原始时间戳
+   * @param value 信号值
+   */
   private updateBucket(
     collection: BucketCollection,
     signalName: string,
@@ -497,14 +624,17 @@ export class DbRepo {
     timestamp: number,
     value: number
   ): void {
+    // 获取该信号的所有时间桶
     let signalBuckets = collection.get(signalName);
     if (!signalBuckets) {
       signalBuckets = new Map();
       collection.set(signalName, signalBuckets);
     }
 
+    // 获取指定的时间桶
     const bucket = signalBuckets.get(bucketTimestamp);
     if (!bucket) {
+      // 新桶：初始化为当前值
       signalBuckets.set(bucketTimestamp, {
         firstTimestamp: timestamp,
         firstValue: value,
@@ -518,6 +648,9 @@ export class DbRepo {
       return;
     }
 
+    // 已存在桶：更新统计值
+    
+    // 更新首尾值和时间戳
     if (timestamp < bucket.firstTimestamp) {
       bucket.firstTimestamp = timestamp;
       bucket.firstValue = value;
@@ -526,6 +659,8 @@ export class DbRepo {
       bucket.lastTimestamp = timestamp;
       bucket.lastValue = value;
     }
+    
+    // 更新聚合统计
     bucket.sum += value;
     bucket.count += 1;
     if (value > bucket.max) {
@@ -536,6 +671,26 @@ export class DbRepo {
     }
   }
 
+  /**
+   * 查询历史数据
+   * 
+   * 功能: 根据时间范围和精度查询聚合后的历史信号值
+   * 
+   * 查询策略:
+   * - 根据step选择1秒表或10秒表
+   * - 使用索引优化 (timestamp, signal_name)
+   * - 返回聚合统计值而非原始值
+   * 
+   * 使用场景:
+   * - 1s: 近期历史，细粒度分析（如过去1小时）
+   * - 10s: 长期历史，趋势分析（如过去1天）
+   * 
+   * @param signals 信号名称列表
+   * @param from 起始时间
+   * @param to 结束时间
+   * @param step 时间精度 ('1s' | '10s')
+   * @returns 聚合数据列表
+   */
   queryHistory(signals: string[], from: Date, to: Date, step: '1s' | '10s' = '1s'): DbSignalAgg[] {
     if (this.isCorrupted) {
       logger.warn('Database is corrupted, returning empty history');
@@ -547,9 +702,8 @@ export class DbRepo {
       const toTs = to.getTime();
       const placeholders = signals.map(() => '?').join(',');
 
-      // Use cached statement if available, otherwise create new one
-      // Note: We need dynamic statements because signals array can vary in length
-      // But we can optimize by preparing a statement for common signal counts
+      // 动态SQL（因为信号数量可变）
+      // 注意：可以通过缓存常用数量的statement进一步优化
       const stmt = this.db.prepare(`
         SELECT timestamp, signal_name, last_value, first_value, avg_value, max_value, min_value
         FROM ${step === '1s' ? 'signals_agg_1s' : 'signals_agg_10s'}
@@ -574,6 +728,21 @@ export class DbRepo {
     }
   }
 
+  /**
+   * 按TTL清理过期数据
+   * 
+   * 功能: 删除指定天数前的数据，控制数据库大小
+   * 
+   * 清理策略:
+   * - 默认清理7天前的数据
+   * - 批量删除所有表的过期数据
+   * - 10%概率执行VACUUM（碎片整理，较耗时）
+   * 
+   * 执行时机:
+   * - 每小时自动执行一次
+   * 
+   * @param days 保留天数（默认7天）
+   */
   cleanupTTL(days: number = 7): void {
     if (this.isCorrupted) {
       logger.warn('Skipping cleanup due to database corruption');
@@ -583,12 +752,15 @@ export class DbRepo {
     try {
       const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
       
+      // 使用预编译语句批量删除
       this.cleanupFramesStmt!.run(cutoff);
       this.cleanup1sStmt!.run(cutoff);
       this.cleanup10sStmt!.run(cutoff);
       this.cleanupAlarmStmt!.run(cutoff);
       
       // Run VACUUM periodically to reclaim space (but not too often)
+      // VACUUM会整理数据库碎片并回收空间，但较耗时
+      // 使用10%概率避免频繁执行
       if (Math.random() < 0.1) { // 10% chance each cleanup
         this.db.exec('VACUUM');
       }
@@ -597,6 +769,24 @@ export class DbRepo {
     }
   }
 
+  /**
+   * 获取信号快照（最新值）
+   * 
+   * 功能: 查询每个信号的最新值，用于实时显示
+   * 
+   * 查询策略:
+   * - 使用子查询获取每个信号的最大时间戳
+   * - 仅返回last_value（最新值）
+   * - 从1秒表中查询（更精确）
+   * 
+   * 使用场景:
+   * - 实时仪表盘
+   * - 状态监控
+   * - API快照接口
+   * 
+   * @param signals 信号名称列表
+   * @returns 信号名到最新值的映射
+   */
   getSnapshot(signals: string[]): Record<string, number> {
     if (signals.length === 0) return {};
     if (this.isCorrupted) {
@@ -606,7 +796,7 @@ export class DbRepo {
 
     try {
       const placeholders = signals.map(() => '?').join(',');
-      // Get the latest value for each signal using a subquery
+      // 使用子查询获取每个信号的最新值
       const stmt = this.db.prepare(`
         SELECT signal_name, last_value
         FROM signals_agg_1s s1

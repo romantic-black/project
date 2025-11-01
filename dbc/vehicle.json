@@ -23,12 +23,12 @@
           "startBit": 11,
           "length": 12,
           "factor": 0.05,
-          "offset": 0,
+          "offset": -30,
           "unit": "km/h",
           "endianness": "big",
           "signed": false,
-          "min": 0,
-          "max": 60,
+          "min": -30,
+          "max": 30,
           "comment": "陆上控制器目标速度请求"
         },
         {
