@@ -12,6 +12,13 @@
   - 生成完整安装包（macOS dmg、Windows NSIS、Linux AppImage）：`pnpm --filter desktop dist`。
 - 打包产物默认输出在 `apps/desktop/release`。
 
+### 根据部署环境写入 WebSocket 地址
+- 打包前请在环境中设置所需的 WebSocket 地址，例如 `DESKTOP_WS_URL=ws://192.168.1.10:8080`。
+- 运行 `pnpm --filter desktop bundle` 时脚本会：
+  1. 执行 `apps/desktop/scripts/write-config.cjs`，生成 `apps/desktop/config.json`（包含 `wsUrl`）。
+  2. 触发 `pnpm --dir apps/web build`，同时注入 `VITE_DESKTOP_APP=1` 以生成相对路径的渲染资源，并自动复制到 `apps/desktop/renderer/`。
+- 桌面应用启动后，`apps/desktop/preload.js` 会将 `config.json` 中的内容暴露为 `window.desktop.config.wsUrl`，React 前端会优先使用该值建立 WebSocket 连接。
+
 ## Orin (Ubuntu 20.04, ARM64) 交叉构建
 
 **需求**：在 x86_64 开发机上构建可在 Orin 车载终端（Ubuntu 20.04, ARM64）运行的 AppImage。
