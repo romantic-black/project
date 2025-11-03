@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --parallel --filter './apps/*' dev",
+    "dev": "pnpm --parallel --filter './apps/server' --filter './apps/web' dev",
+    "dev:all": "pnpm --parallel --filter './apps/*' dev",
     "build": "pnpm --filter './packages/*' build && pnpm --filter './apps/*' build",
     "db:push": "pnpm --filter server db:push",
     "seed": "pnpm --filter server seed"
