@@ -1,23 +1,13 @@
-const { contextBridge } = require('electron');
-const fs = require('fs');
-const path = require('path');
+const { contextBridge, ipcRenderer } = require('electron');
 
-function loadConfig() {
-  const configPath = path.join(__dirname, 'config.json');
+let config = {};
 
-  try {
-    if (fs.existsSync(configPath)) {
-      const raw = fs.readFileSync(configPath, 'utf8');
-      return JSON.parse(raw);
-    }
-  } catch (error) {
-    console.warn('Failed to load desktop config:', error);
-  }
-
-  return {};
+try {
+  config = ipcRenderer.sendSync('desktop:get-config') ?? {};
+} catch (error) {
+  console.warn('Failed to retrieve desktop config:', error);
+  config = {};
 }
-
-const config = loadConfig();
 
 contextBridge.exposeInMainWorld('desktop', {
   platform: process.platform,

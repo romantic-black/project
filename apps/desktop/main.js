@@ -1,10 +1,30 @@
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 const devServerUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
 
+function loadDesktopConfig() {
+  const configPath = path.join(__dirname, 'config.json');
+
+  try {
+    if (fs.existsSync(configPath)) {
+      const raw = fs.readFileSync(configPath, 'utf8');
+      return JSON.parse(raw);
+    }
+  } catch (error) {
+    console.warn('Failed to load desktop config:', error);
+  }
+
+  return {};
+}
+
+let desktopConfig = loadDesktopConfig();
+
 function createWindow() {
+  desktopConfig = loadDesktopConfig();
+
   const mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -30,6 +50,10 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  ipcMain.on('desktop:get-config', (event) => {
+    event.returnValue = desktopConfig;
+  });
+
   createWindow();
 
   app.on('activate', () => {
