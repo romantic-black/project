@@ -1,5 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { sendCanFrame } from '../services/api';
+import MapContainer from '../components/MapContainer';
+import RosConnectionStatus from '../components/RosConnectionStatus';
+import { useRosWebSocket } from '../hooks/useRosWebSocket';
+import { useMapStore } from '../stores/map';
+import { displayToMap } from '../utils/coordinates';
 
 export default function Control() {
   const [landTakeover, setLandTakeover] = useState(false);
@@ -8,6 +13,15 @@ export default function Control() {
   const [seaThrottle, setSeaThrottle] = useState(0);
   const [remoteMode, setRemoteMode] = useState<'auto' | 'remote'>('auto');
   const [sending, setSending] = useState(false);
+
+  // ROS WebSocket connection
+  const { publishWaypoint, isConnected } = useRosWebSocket({
+    autoConnect: true,
+    rosBridgeUrl: import.meta.env.VITE_ROS_BRIDGE_URL,
+    mapFrame: import.meta.env.VITE_MAP_FRAME || 'map',
+  });
+
+  const { mapOrigin, mapScale, addWaypoint } = useMapStore();
 
   const sendLandTakeover = async (active: boolean) => {
     setSending(true);
@@ -79,10 +93,63 @@ export default function Control() {
     }
   };
 
+  // Handle map click - send waypoint to ROS
+  const handleMapClick = (lat: number, lng: number) => {
+    if (!isConnected) {
+      alert('ROS未连接，无法发送目标点');
+      return;
+    }
+
+    // Convert display coordinates to map coordinates
+    const mapPoint = displayToMap(lat, lng, mapOrigin, mapScale);
+    
+    // Add waypoint to store
+    const waypointId = `waypoint-${Date.now()}`;
+    addWaypoint({
+      id: waypointId,
+      position: mapPoint,
+      timestamp: Date.now(),
+    });
+
+    // Publish waypoint to ROS
+    publishWaypoint(mapPoint.x, mapPoint.y, mapPoint.z || 0);
+    
+    console.log('Waypoint sent:', mapPoint);
+  };
+
+  // Set map origin to vehicle position when first received
+  useEffect(() => {
+    const vehiclePosition = useMapStore.getState().vehiclePosition;
+    if (vehiclePosition && !mapOrigin) {
+      useMapStore.getState().setMapOrigin({
+        x: vehiclePosition.x,
+        y: vehiclePosition.y,
+        z: vehiclePosition.z,
+      });
+    }
+  }, [mapOrigin]);
+
   return (
     <div className="px-4 sm:px-6 lg:px-8">
       <h2 className="text-2xl font-bold text-gray-900 py-4">控制面板</h2>
 
+      {/* ROS Connection Status */}
+      <div className="mb-6">
+        <RosConnectionStatus />
+      </div>
+
+      {/* Map Container - Main Area */}
+      <div className="mb-6">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-lg font-semibold mb-3">地图导航</h3>
+          <div className="mb-2 text-sm text-gray-600">
+            点击地图发送目标点 | 蓝色标记：车辆位置 | 绿色标记：目标点 | 蓝色线条：规划轨迹
+          </div>
+          <MapContainer onMapClick={handleMapClick} height="600px" />
+        </div>
+      </div>
+
+      {/* Control Panels */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="bg-white p-6 rounded-lg shadow">
           <h3 className="text-lg font-semibold mb-4">遥控器模式</h3>
