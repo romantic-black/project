@@ -16,7 +16,7 @@
     "leaflet": "^1.9.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-leaflet": "^5.0.0",
+    "react-leaflet": "^4.2.1",
     "react-router-dom": "^6.21.3",
     "roslib": "^1.4.1",
     "zod": "^3.22.4",

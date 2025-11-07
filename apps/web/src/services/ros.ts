@@ -17,7 +17,9 @@ export class RosService {
   private subscribers: Map<string, ROSLIB.Topic> = new Map();
   private publishers: Map<string, ROSLIB.Topic> = new Map();
   private config: RosServiceConfig;
-  private store = useMapStore.getState();
+  private get store() {
+    return useMapStore.getState();
+  }
 
   constructor(config: RosServiceConfig = {}) {
     const defaultUrl = config.url || import.meta.env.VITE_ROS_BRIDGE_URL || 'ws://localhost:9090';
@@ -41,46 +43,68 @@ export class RosService {
         this.store.setRosConnectionStatus('connecting');
         this.store.setRosError(null);
 
+        // Ensure URL is properly formatted
+        let url = this.config.url;
+        if (!url.startsWith('ws://') && !url.startsWith('wss://')) {
+          url = `ws://${url}`;
+        }
+        // Remove trailing slash if present
+        url = url.replace(/\/$/, '');
+
+        console.log('Connecting to ROS bridge at:', url);
+        this.store.setRosBridgeUrl(url);
+
         this.ros = new ROSLIB.Ros({
-          url: this.config.url,
+          url: url,
         });
 
+        // Timeout after 5 seconds
+        const timeoutId = setTimeout(() => {
+          if (this.store.rosConnectionStatus === 'connecting') {
+            this.ros?.close();
+            const errorMsg = `连接超时。请确保rosbridge_server正在运行: roslaunch rosbridge_server rosbridge_websocket.launch port:=9090`;
+            console.error(errorMsg);
+            this.store.setRosConnectionStatus('error');
+            this.store.setRosError(errorMsg);
+            reject(new Error(errorMsg));
+          }
+        }, 5000);
+
         this.ros.on('connection', () => {
-          console.log('ROS connected');
+          clearTimeout(timeoutId);
+          console.log('ROS connected successfully to:', url);
           this.store.setRosConnectionStatus('connected');
           this.store.setRosError(null);
           resolve();
         });
 
-        this.ros.on('error', (error: Error) => {
-          console.error('ROS connection error:', error);
+        this.ros.on('error', (error: any) => {
+          clearTimeout(timeoutId);
+          const errorMsg = error?.message || error?.toString() || 'Connection failed';
+          console.error('ROS connection error:', errorMsg, 'URL:', url, { raw: error });
           this.store.setRosConnectionStatus('error');
-          this.store.setRosError(error.message || 'Connection failed');
-          reject(error);
+          this.store.setRosError(`连接失败: ${errorMsg}。请确保rosbridge_server正在运行: roslaunch rosbridge_server rosbridge_websocket.launch port:=9090`);
+          reject(new Error(errorMsg));
         });
 
-        this.ros.on('close', () => {
-          console.log('ROS connection closed');
+        this.ros.on('close', (event?: CloseEvent) => {
+          clearTimeout(timeoutId);
+          console.warn('ROS connection closed', {
+            code: event?.code,
+            reason: event?.reason || 'No reason provided',
+            wasClean: event?.wasClean,
+            url,
+          });
           this.store.setRosConnectionStatus('disconnected');
           // Clear all subscribers
           this.subscribers.forEach((sub) => sub.unsubscribe());
           this.subscribers.clear();
         });
-
-        // Timeout after 5 seconds
-        setTimeout(() => {
-          if (this.store.rosConnectionStatus === 'connecting') {
-            this.ros?.close();
-            const error = new Error('Connection timeout. Please ensure rosbridge_server is running.');
-            this.store.setRosConnectionStatus('error');
-            this.store.setRosError(error.message);
-            reject(error);
-          }
-        }, 5000);
       } catch (error) {
         const err = error instanceof Error ? error : new Error('Unknown error');
+        console.error('Failed to create ROS connection:', err);
         this.store.setRosConnectionStatus('error');
-        this.store.setRosError(err.message);
+        this.store.setRosError(`创建连接失败: ${err.message}`);
         reject(err);
       }
     });
@@ -90,6 +114,7 @@ export class RosService {
    * Disconnect from rosbridge
    */
   disconnect(): void {
+    console.warn('RosService disconnect invoked');
     this.subscribers.forEach((sub) => sub.unsubscribe());
     this.subscribers.clear();
     this.publishers.clear();
@@ -356,4 +381,3 @@ export function resetRosService(): void {
     rosServiceInstance = null;
   }
 }
-

@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { MapContainer as LeafletMapContainer, TileLayer, Marker, Polyline, Circle, useMap, useMapEvents } from 'react-leaflet';
+import { useEffect, useRef } from 'react';
+import { MapContainer as LeafletMapContainer, TileLayer, Marker, Polyline, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useMapStore } from '../stores/map';
 import { mapToDisplay } from '../utils/coordinates';
@@ -36,18 +36,6 @@ interface MapContainerProps {
   height?: string;
 }
 
-// Component to handle map click events
-function MapClickHandler({ onMapClick }: { onMapClick?: (lat: number, lng: number) => void }) {
-  useMapEvents({
-    click: (e) => {
-      if (onMapClick) {
-        onMapClick(e.latlng.lat, e.latlng.lng);
-      }
-    },
-  });
-  return null;
-}
-
 // Component to update map view when vehicle position changes
 function MapViewUpdater() {
   const map = useMap();
@@ -56,7 +44,7 @@ function MapViewUpdater() {
   const mapScale = useMapStore((state) => state.mapScale);
 
   useEffect(() => {
-    if (vehiclePosition && mapOrigin) {
+    if (vehiclePosition && mapOrigin && map) {
       const display = mapToDisplay(
         { x: vehiclePosition.x, y: vehiclePosition.y, z: vehiclePosition.z },
         mapOrigin,
@@ -78,6 +66,8 @@ export default function MapContainer({ onMapClick, height = '600px' }: MapContai
     mapOrigin,
     mapScale,
   } = useMapStore();
+
+  const mapRef = useRef<L.Map | null>(null);
 
   // Initialize map origin to default if not set
   useEffect(() => {
@@ -110,6 +100,13 @@ export default function MapContainer({ onMapClick, height = '600px' }: MapContai
   // Default zoom level
   const defaultZoom = 15;
 
+  // Handle map click using event handler
+  const handleMapClick = (e: L.LeafletMouseEvent) => {
+    if (onMapClick) {
+      onMapClick(e.latlng.lat, e.latlng.lng);
+    }
+  };
+
   return (
     <div style={{ height, width: '100%', position: 'relative' }}>
       <LeafletMapContainer
@@ -117,6 +114,10 @@ export default function MapContainer({ onMapClick, height = '600px' }: MapContai
         zoom={defaultZoom}
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom={true}
+        whenCreated={(map) => {
+          mapRef.current = map;
+          map.on('click', handleMapClick);
+        }}
       >
         {/* Offline tile layer - using OpenStreetMap as placeholder */}
         {/* In production, you may want to use offline tiles or ROS map server */}
@@ -125,9 +126,6 @@ export default function MapContainer({ onMapClick, height = '600px' }: MapContai
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           // For offline maps, you would use a local tile server or pre-downloaded tiles
         />
-
-        {/* Map click handler */}
-        <MapClickHandler onMapClick={onMapClick} />
 
         {/* Map view updater */}
         <MapViewUpdater />

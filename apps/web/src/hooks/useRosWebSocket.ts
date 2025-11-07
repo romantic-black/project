@@ -18,7 +18,9 @@ export function useRosWebSocket(options: UseRosWebSocketOptions = {}) {
   const rosServiceRef = useRef<ReturnType<typeof getRosService> | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const isConnectingRef = useRef(false);
-  const { rosConnectionStatus, setRosConnectionStatus, setRosError } = useMapStore();
+  const rosConnectionStatus = useMapStore((state) => state.rosConnectionStatus);
+  const setRosConnectionStatus = useMapStore((state) => state.setRosConnectionStatus);
+  const setRosError = useMapStore((state) => state.setRosError);
 
   useEffect(() => {
     let mounted = true;
@@ -132,4 +134,3 @@ export function useRosWebSocket(options: UseRosWebSocketOptions = {}) {
     connectionStatus: rosConnectionStatus,
   };
 }
-
