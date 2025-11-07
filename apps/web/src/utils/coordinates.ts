@@ -127,20 +127,26 @@ export function parseRosTime(time: any): number {
 export function mapToDisplay(
   mapPoint: MapPoint,
   mapOrigin: MapPoint | null,
-  scale: number = 1.0
+  scale: number = 1.0,
+  mapOriginGps?: GpsPoint | null
 ): { lat: number; lng: number } {
-  // If origin is set, use it as offset
-  if (mapOrigin) {
-    // Convert map coordinates relative to origin to lat/lng
-    // For display purposes, treat map x/y as meters, convert to approximate lat/lng
-    // This is a simplified conversion; adjust based on actual map frame
-    const lng = mapOrigin.x + (mapPoint.x / scale);
-    const lat = mapOrigin.y + (mapPoint.y / scale);
-    return { lat, lng };
+  if (mapOrigin && mapOriginGps) {
+    const metersPerUnit = scale || 1.0;
+    const eastMeters = (mapPoint.x - mapOrigin.x) * metersPerUnit;
+    const northMeters = (mapPoint.y - mapOrigin.y) * metersPerUnit;
+
+    const metersPerDegLat = getMetersPerDegreeLatitude(mapOriginGps.latitude);
+    const metersPerDegLng = getMetersPerDegreeLongitude(mapOriginGps.latitude);
+
+    const latOffset = northMeters / metersPerDegLat;
+    const lngOffset = eastMeters / metersPerDegLng;
+
+    return {
+      lat: mapOriginGps.latitude + latOffset,
+      lng: mapOriginGps.longitude + lngOffset,
+    };
   }
-  
-  // Default: treat map coordinates as lat/lng directly
-  // Adjust this based on your actual map frame definition
+
   return {
     lat: mapPoint.y,
     lng: mapPoint.x,
@@ -154,22 +160,43 @@ export function displayToMap(
   lat: number,
   lng: number,
   mapOrigin: MapPoint | null,
-  scale: number = 1.0
+  scale: number = 1.0,
+  mapOriginGps?: GpsPoint | null
 ): MapPoint {
-  if (mapOrigin) {
+  if (mapOrigin && mapOriginGps) {
+    const metersPerUnit = scale || 1.0;
+    const metersPerDegLat = getMetersPerDegreeLatitude(mapOriginGps.latitude);
+    const metersPerDegLng = getMetersPerDegreeLongitude(mapOriginGps.latitude);
+
+    const latDiff = lat - mapOriginGps.latitude;
+    const lngDiff = lng - mapOriginGps.longitude;
+
+    const northMeters = latDiff * metersPerDegLat;
+    const eastMeters = lngDiff * metersPerDegLng;
+
     return {
-      x: (lng - mapOrigin.x) * scale,
-      y: (lat - mapOrigin.y) * scale,
+      x: mapOrigin.x + eastMeters / metersPerUnit,
+      y: mapOrigin.y + northMeters / metersPerUnit,
       z: 0,
     };
   }
-  
-  // Default: treat lat/lng as map coordinates directly
+
   return {
     x: lng,
     y: lat,
     z: 0,
   };
+}
+
+function getMetersPerDegreeLatitude(latitude: number): number {
+  const latRad = (latitude * Math.PI) / 180;
+  // Using WGS84 ellipsoid approximations
+  return 111132.92 - 559.82 * Math.cos(2 * latRad) + 1.175 * Math.cos(4 * latRad);
+}
+
+function getMetersPerDegreeLongitude(latitude: number): number {
+  const latRad = (latitude * Math.PI) / 180;
+  return 111412.84 * Math.cos(latRad) - 93.5 * Math.cos(3 * latRad) + 0.118 * Math.cos(5 * latRad);
 }
 
 /**

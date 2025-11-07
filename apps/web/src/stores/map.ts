@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { mapMetersPerUnit } from '../config/map';
 
 // Map coordinate point
 export interface MapPoint {
@@ -68,6 +69,7 @@ interface MapState {
   // Vehicle position
   vehiclePosition: VehiclePosition | null;
   gpsPosition: GpsPoint | null;
+  mapOriginGps: GpsPoint | null;
   
   // Waypoints
   waypoints: Waypoint[];
@@ -89,11 +91,12 @@ interface MapState {
   // Map frame configuration
   mapFrame: string;
   mapOrigin: MapPoint | null; // Origin point in display coordinates
-  mapScale: number; // Scale factor for coordinate conversion
+  mapScale: number; // Map units to meters conversion factor
   
   // Actions
   setVehiclePosition: (position: VehiclePosition | null) => void;
   setGpsPosition: (position: GpsPoint | null) => void;
+  setMapOriginGps: (gps: GpsPoint | null) => void;
   addWaypoint: (waypoint: Waypoint) => void;
   clearWaypoints: () => void;
   setPathPoints: (points: PathPoint[]) => void;
@@ -107,12 +110,14 @@ interface MapState {
   setMapFrame: (frame: string) => void;
   setMapOrigin: (origin: MapPoint | null) => void;
   setMapScale: (scale: number) => void;
+  alignMapWithGps: (mapPoint: MapPoint, gpsPoint: GpsPoint) => void;
   clear: () => void;
 }
 
-export const useMapStore = create<MapState>((set) => ({
+export const useMapStore = create<MapState>((set, get) => ({
   vehiclePosition: null,
   gpsPosition: null,
+  mapOriginGps: null,
   waypoints: [],
   pathPoints: [],
   obstacles: [],
@@ -122,11 +127,13 @@ export const useMapStore = create<MapState>((set) => ({
   topicStatuses: new Map(),
   mapFrame: 'map',
   mapOrigin: null,
-  mapScale: 1.0,
+  mapScale: mapMetersPerUnit,
   
   setVehiclePosition: (position) => set({ vehiclePosition: position }),
   
   setGpsPosition: (position) => set({ gpsPosition: position }),
+
+  setMapOriginGps: (gps) => set({ mapOriginGps: gps }),
   
   addWaypoint: (waypoint) => set((state) => ({
     waypoints: [...state.waypoints, waypoint],
@@ -161,11 +168,25 @@ export const useMapStore = create<MapState>((set) => ({
   
   setMapOrigin: (origin) => set({ mapOrigin: origin }),
   
-  setMapScale: (scale) => set({ mapScale: scale }),
+  setMapScale: (scale) => {
+    const normalized = Number.isFinite(scale) && scale > 0 ? scale : mapMetersPerUnit;
+    set({ mapScale: normalized });
+  },
+
+  alignMapWithGps: (mapPoint, gpsPoint) => {
+    const currentScale = get().mapScale || mapMetersPerUnit;
+
+    set({
+      mapOrigin: mapPoint,
+      mapOriginGps: gpsPoint,
+      mapScale: currentScale,
+    });
+  },
   
   clear: () => set({
     vehiclePosition: null,
     gpsPosition: null,
+    mapOriginGps: null,
     waypoints: [],
     pathPoints: [],
     obstacles: [],

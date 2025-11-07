@@ -21,7 +21,7 @@ export default function Control() {
     mapFrame: import.meta.env.VITE_MAP_FRAME || 'map',
   });
 
-  const { mapOrigin, mapScale, addWaypoint } = useMapStore();
+  const { mapOrigin, mapOriginGps, mapScale, addWaypoint } = useMapStore();
 
   const sendLandTakeover = async (active: boolean) => {
     setSending(true);
@@ -101,7 +101,7 @@ export default function Control() {
     }
 
     // Convert display coordinates to map coordinates
-    const mapPoint = displayToMap(lat, lng, mapOrigin, mapScale);
+    const mapPoint = displayToMap(lat, lng, mapOrigin, mapScale, mapOriginGps);
     
     // Add waypoint to store
     const waypointId = `waypoint-${Date.now()}`;

@@ -24,14 +24,35 @@ export class RosService {
   constructor(config: RosServiceConfig = {}) {
     const defaultUrl = config.url || import.meta.env.VITE_ROS_BRIDGE_URL || 'ws://localhost:9090';
     const defaultMapFrame = config.mapFrame || 'map';
-    
+
     this.config = {
       url: defaultUrl,
       mapFrame: defaultMapFrame,
     };
-    
+
     this.store.setMapFrame(defaultMapFrame);
     this.store.setRosBridgeUrl(defaultUrl);
+  }
+
+  updateConfig(config: RosServiceConfig = {}): void {
+    const nextUrl = config.url || this.config.url || import.meta.env.VITE_ROS_BRIDGE_URL || 'ws://localhost:9090';
+    const nextMapFrame = config.mapFrame || this.config.mapFrame || 'map';
+
+    const urlChanged = nextUrl !== this.config.url;
+    const frameChanged = nextMapFrame !== this.config.mapFrame;
+
+    this.config = {
+      url: nextUrl,
+      mapFrame: nextMapFrame,
+    };
+
+    if (urlChanged) {
+      this.store.setRosBridgeUrl(nextUrl);
+    }
+
+    if (frameChanged) {
+      this.store.setMapFrame(nextMapFrame);
+    }
   }
 
   /**
@@ -204,6 +225,18 @@ export class RosService {
       const gps = extractGpsFromNavSatFix(message);
       if (gps) {
         this.store.setGpsPosition(gps);
+
+        const currentState = this.store;
+        if (currentState.vehiclePosition && (!currentState.mapOriginGps || !currentState.mapOrigin)) {
+          currentState.alignMapWithGps(
+            {
+              x: currentState.vehiclePosition.x,
+              y: currentState.vehiclePosition.y,
+              z: currentState.vehiclePosition.z,
+            },
+            gps
+          );
+        }
       }
     });
 
@@ -371,6 +404,8 @@ let rosServiceInstance: RosService | null = null;
 export function getRosService(config?: RosServiceConfig): RosService {
   if (!rosServiceInstance) {
     rosServiceInstance = new RosService(config);
+  } else if (config) {
+    rosServiceInstance.updateConfig(config);
   }
   return rosServiceInstance;
 }
